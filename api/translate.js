@@ -29,9 +29,10 @@ export default async function handler(req, res) {
 
 入力テキスト: ${text}`;
 
-    // ✅ 2026年最新の安定版エンドポイントとモデル名に固定
+    // ✅ Fix1: 正しいモデル名 gemini-2.5-flash（安定版GA）
+    // ✅ Fix2: 正しいエンドポイント v1beta（v1ではない）
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1/models/gemini-3-flash:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -47,8 +48,8 @@ export default async function handler(req, res) {
     const data = await response.json();
 
     if (data.error) {
-      return res.status(200).json({ 
-        error: "Google APIエラー", 
+      return res.status(200).json({
+        error: "Google APIエラー",
         detail: data.error.message || "原因不明のエラー"
       });
     }
@@ -56,7 +57,13 @@ export default async function handler(req, res) {
     const resultText = data.candidates?.[0]?.content?.parts?.[0]?.text;
     if (!resultText) throw new Error("AIの応答が空です");
 
-    return res.status(200).json(JSON.parse(resultText));
+    // ✅ Fix3: パース失敗時のフォールバック付き
+    try {
+      return res.status(200).json(JSON.parse(resultText));
+    } catch {
+      const match = resultText.match(/```(?:json)?\s*([\s\S]*?)```/);
+      return res.status(200).json(JSON.parse(match ? match[1].trim() : resultText.trim()));
+    }
 
   } catch (err) {
     return res.status(200).json({ error: "サーバー処理エラー", detail: err.message });
