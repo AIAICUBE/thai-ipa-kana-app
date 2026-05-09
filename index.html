@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>タイ語翻訳ツール</title>
+    <style>body{font-family:sans-serif;padding:20px;background:#f4f7f6;}.box{max-width:500px;margin:0 auto;background:#fff;padding:20px;border-radius:8px;box-shadow:0 2px 10px rgba(0,0,0,0.1);}textarea{width:100%;height:100px;margin:10px 0;}button{width:100%;padding:10px;background:#3498db;color:#fff;border:none;cursor:pointer;}</style>
+</head>
+<body>
+    <div class="box">
+        <h2>タイ語 ⇄ 日本語</h2>
+        <textarea id="input" placeholder="ここに入力..."></textarea>
+        <button onclick="translate()">変換する</button>
+        <div id="result" style="margin-top:20px; display:none;">
+            <p><strong>意味:</strong> <span id="out_t"></span></p>
+            <p><strong>IPA:</strong> <span id="out_i"></span></p>
+            <p><strong>カタカナ:</strong> <span id="out_k"></span></p>
+        </div>
+    </div>
+    <script>
+        async function translate() {
+            const text = document.getElementById('input').value;
+            if(!text) return;
+            try {
+                const res = await fetch('/api/translate', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ text })
+                });
+                const data = await res.json();
+                if(data.error) throw new Error(data.error);
+                document.getElementById('out_t').innerText = data.translation;
+                document.getElementById('out_i').innerText = data.ipa;
+                document.getElementById('out_k').innerText = data.katakana;
+                document.getElementById('result').style.display = 'block';
+            } catch (e) { alert("エラー: " + e.message); }
+        }
+    </script>
+</body>
+</html>
