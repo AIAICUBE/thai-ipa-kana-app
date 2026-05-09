@@ -1,5 +1,6 @@
-export default async function handler(req, res) {
-  // CORS設定（ブラウザからの通信を許可）
+// api/translate.js
+module.exports = async function handler(req, res) {
+  // ブラウザからのアクセスを許可する設定
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -14,18 +15,28 @@ export default async function handler(req, res) {
 
   try {
     const { text } = req.body;
-    const apiKey = process.env.GEMINI_API_KEY?.trim();
+    // 空白を削除してAPIキーを読み込む
+    const apiKey = process.env.GEMINI_API_KEY ? process.env.GEMINI_API_KEY.trim() : null;
 
     if (!apiKey) {
-      return res.status(500).json({ error: 'APIキーがVercelに設定されていません' });
+      return res.status(500).json({ error: 'APIキーが設定されていません' });
     }
 
-    const prompt = `タイ語と日本語の翻訳専門家として、以下のテキストを翻訳・解析してください。
-タイ語特有の「分かち書きなし」を考慮し、適切に分割して解析してください。
-入力: "${text}"
-必ず以下のJSON形式のみで返してください（余計な文字は一切不要）。
-{"translation": "意味", "ipa": "IPA", "katakana": "カタカナ（平声:→,高声:↑,低声:↓,下がる:↘,上がる:↗,長音:〜を付ける）"}`;
+    // タイ語は単語間にスペースがなく、文末に句読点も置かない特徴があります
+    const prompt = `あなたはタイ語と言語学の専門家です。
+以下のテキストを翻訳し、IPA、独自のカタカナ表記をJSONで出力してください。
+タイ語は分かち書きがないため、適切に分割して解析してください。
 
+入力: "${text}"
+
+【カタカナ表記ルール】
+平声:→、高声:↑、低声:↓、下がる:↘、上がる:↗、長音:〜 
+全ての単語に声調記号を付けてください。
+
+【出力形式】
+{"translation": "日本語の意味", "ipa": "IPA表記", "katakana": "カタカナ表記"}`;
+
+    // Vercel Node.js 18+ の標準 fetch を使用
     const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -33,11 +44,18 @@ export default async function handler(req, res) {
     });
 
     const data = await response.json();
-    const resultText = data.candidates[0].content.parts[0].text.replace(/```json|
+    
+    if (data.error) {
+      return res.status(500).json({ error: 'Gemini API Error: ' + data.error.message });
+    }
+
+    // AIの返答からJSON部分を抽出
+    let resultText = data.candidates[0].content.parts[0].text;
+    const cleanJson = resultText.replace(/```json/g, '').replace(/
 ```/g, '').trim();
     
-    return res.status(200).json(JSON.parse(resultText));
+    return res.status(200).json(JSON.parse(cleanJson));
   } catch (err) {
-    return res.status(500).json({ error: 'Internal Error: ' + err.message });
+    return res.status(500).json({ error: 'システムエラー: ' + err.message });
   }
-}
+};
