@@ -1,15 +1,29 @@
 export default async function handler(req, res) {
-  if (req.method !== 'POST') return res.status(405).end();
+  // CORSガード（ブラウザからの通信を許可）
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+  if (req.method === 'OPTIONS') return res.status(200).end();
 
   try {
-    const { text } = req.body;
+    const { text } = await req.body;
     const apiKey = process.env.GEMINI_API_KEY?.trim();
 
-    const prompt = `タイ語は分かち書きがなく、5つの声調（平声、低声、高声、下がる、上がる）を持つ言語です。
-以下のテキストを適切に分割・解析し、JSONでのみ返してください。
+    if (!apiKey) return res.status(200).json({ error: "APIキーが設定されていません。" });
+
+    const prompt = `あなたはタイ語翻訳の専門家です。
+以下のテキストを翻訳し、IPA、独自のカタカナ表記をJSONで出力してください。
+タイ語は分かち書きがないため、適切に分割して解析してください。
+
 入力: "${text}"
-【ルール】カタカナ表記には必ず声調記号（平声:→, 高声:↑, 低声:↓, 下がる:↘, 上がる:↗, 長音:〜）を付けてください。
-{"translation": "日本語の意味", "ipa": "IPA", "katakana": "声調記号付きカタカナ"}`;
+
+【カタカナ表記ルール】
+平声:→, 高声:↑, 低声:↓, 下がる:↘, 上がる:↗, 長音:〜 
+全ての単語に声調記号を付けてください。
+
+【出力形式】
+{"translation": "...", "ipa": "...", "katakana": "..."}`;
 
     const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
       method: 'POST',
@@ -18,10 +32,15 @@ export default async function handler(req, res) {
     });
 
     const data = await response.json();
-    const result = data.candidates[0].content.parts[0].text.replace(/```json|
+    
+    if (data.error) return res.status(200).json({ error: "Google API Error: " + data.error.message });
+
+    let result = data.candidates[0].content.parts[0].text.replace(/```json|
 ```/g, '').trim();
-    res.status(200).json(JSON.parse(result));
+    return res.status(200).json(JSON.parse(result));
+
   } catch (err) {
-    res.status(200).json({ error: "解析エラー: " + err.message });
+    // 500エラーを回避するため、あえて200で詳細を返す
+    return res.status(200).json({ error: "実行エラー", message: err.message });
   }
 }
