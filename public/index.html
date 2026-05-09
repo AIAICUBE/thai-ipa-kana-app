@@ -52,7 +52,7 @@
 </div>
 
 <script>
-    async function translateText() {
+async function translateText() {
         const text = document.getElementById("inputText").value.trim();
         const direction = document.querySelector('input[name="direction"]:checked').value;
         const btn = document.getElementById("translateBtn");
@@ -60,25 +60,32 @@
 
         if (!text) return alert("テキストを入力してください。");
 
-        // UIをロード中にする
         btn.disabled = true;
         btn.textContent = "変換中...";
         resultBox.style.display = "none";
 
         try {
-            // VercelのバックエンドAPIを呼び出す
             const response = await fetch('/api/translate', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ text: text, direction: direction })
             });
 
-            const data = await response.json();
+            // JSONではなく、Vercelからの返答を一旦そのままの「文字」として受け取る
+            const responseText = await response.text(); 
+
+            let data;
+            try {
+                data = JSON.parse(responseText); // ここでJSONに変換
+            } catch (parseError) {
+                // Vercelがクラッシュしてエラー画面（HTML）を返してきている場合
+                alert("Vercelのエラー（通信エラーの正体）:\n" + responseText.substring(0, 300));
+                return;
+            }
 
             if (data.error) {
-                alert(data.error);
+                alert("バックエンドからのエラー報告:\n" + data.error);
             } else {
-                // 結果を画面に反映
                 document.getElementById("targetLangLabel").textContent = direction === "th2jp" ? "日本語の意味" : "タイ語";
                 document.getElementById("outTargetLang").textContent = data.translation;
                 document.getElementById("outIpa").textContent = data.ipa;
@@ -86,9 +93,8 @@
                 resultBox.style.display = "block";
             }
         } catch (error) {
-            alert("通信エラーが発生しました。");
+            alert("完全なネットワーク切断などのエラー:\n" + error.message);
         } finally {
-            // UIを元に戻す
             btn.disabled = false;
             btn.textContent = "変換する";
         }
