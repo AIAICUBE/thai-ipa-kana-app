@@ -6,9 +6,8 @@ module.exports = async function handler(req, res) {
     const { text, direction } = req.body;
     const apiKey = process.env.GEMINI_API_KEY; 
 
-    // ① APIキーがVercelにちゃんと設定されているかチェック
     if (!apiKey) {
-        return res.status(500).json({ error: 'APIキーが見つかりません。VercelのEnvironment Variablesの設定を確認してください。' });
+        return res.status(500).json({ error: 'APIキーが見つかりません。' });
     }
 
     const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
@@ -33,21 +32,31 @@ module.exports = async function handler(req, res) {
 
         const data = await response.json();
 
-        // ② Google(Gemini)のAPI自体からエラーで怒られていないかチェック
         if (!response.ok || data.error) {
             return res.status(500).json({ error: `Google APIエラー: ${data.error?.message || '不明なエラー'}` });
         }
         
-        let resultText = data.candidates[0].content.parts[0].text;
+        // ★ ここが今回の修正ポイント：AIが空のデータを返した時の安全装置 ★
+        if (!data.candidates || data.candidates.length === 0) {
+            // セーフティフィルターなどでブロックされた場合、その理由を画面に返す
+            const blockReason = data.promptFeedback?.blockReason || '不明な理由';
+            return res.status(500).json({ error: `AIが回答を拒否しました（理由: ${blockReason}）。詳細: ${JSON.stringify(data)}` });
+        }
+        
+        // 結果テキストを安全に取り出す
+        let resultText = data.candidates[0].content?.parts?.[0]?.text;
+        
+        if (!resultText) {
+            return res.status(500).json({ error: 'AIの返答の中にテキストデータがありませんでした。' });
+        }
+
         resultText = resultText.replace(/```json/g, '').replace(/```/g, '').trim();
         
-        // ③ AIの返答が正しいJSONフォーマットになっているかチェック
         const jsonResult = JSON.parse(resultText);
         res.status(200).json(jsonResult);
 
     } catch (error) {
         console.error("詳細エラー:", error);
-        // ④ それ以外の予期せぬエラーが起きた場合、その中身を画面に返す
         res.status(500).json({ error: `システムエラー: ${error.message}` });
     }
 }
