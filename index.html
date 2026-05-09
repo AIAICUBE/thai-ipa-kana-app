@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>タイ語・日本語 翻訳ツール</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f0f2f5; }
+        .box { max-width: 500px; margin: 0 auto; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        textarea { width: 100%; height: 80px; margin-bottom: 10px; box-sizing: border-box; }
+        button { width: 100%; padding: 10px; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; }
+        .res { margin-top: 20px; padding: 15px; background: #e9ecef; display: none; border-radius: 5px; }
+    </style>
+</head>
+<body>
+    <div class="box">
+        <h3>タイ語 ⇄ 日本語 変換</h3>
+        <textarea id="in" placeholder="テキストを入力..."></textarea>
+        <button id="btn">変換する</button>
+        <div id="out" class="res">
+            <div><strong>意味:</strong> <span id="t"></span></div>
+            <div><strong>IPA:</strong> <span id="i"></span></div>
+            <div><strong>発音:</strong> <span id="k"></span></div>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('btn').onclick = async () => {
+            const btn = document.getElementById('btn');
+            const text = document.getElementById('in').value;
+            if(!text) return;
+
+            btn.disabled = true;
+            btn.textContent = "変換中...";
+
+            try {
+                const res = await fetch('/api/translate', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ text })
+                });
+                const data = await res.json();
+                if(data.error) throw new Error(data.error);
+
+                document.getElementById('t').textContent = data.translation;
+                document.getElementById('i').textContent = data.ipa;
+                document.getElementById('k').textContent = data.katakana;
+                document.getElementById('out').style.display = 'block';
+            } catch (e) {
+                alert("エラーが発生しました:\n" + e.message);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = "変換する";
+            }
+        };
+    </script>
+</body>
+</html>
