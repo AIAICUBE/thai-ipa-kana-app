@@ -9,6 +9,7 @@
         .box { max-width: 500px; margin: 0 auto; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
         textarea { width: 100%; height: 100px; margin: 10px 0; width: -webkit-fill-available; border: 1px solid #ccc; padding: 10px; }
         button { width: 100%; padding: 12px; background: #3498db; color: #fff; border: none; border-radius: 4px; cursor: pointer; }
+        button:disabled { background: #aaa; cursor: not-allowed; }
         .res { margin-top: 20px; padding: 15px; background: #e8f4f8; display: none; border-radius: 4px; line-height: 1.6; }
     </style>
 </head>
@@ -27,29 +28,32 @@
         async function startApp() {
             const btn = document.getElementById('btn');
             const text = document.getElementById('in').value.trim();
-            if(!text) return;
+            if (!text) return;
 
             btn.disabled = true;
             btn.textContent = "処理中...";
+            document.getElementById('out').style.display = 'none';
 
             try {
                 const res = await fetch('/api/translate', {
                     method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ text })
                 });
-                
+
                 const data = await res.json();
-                if(data.error) {
-                    alert("エラー通知:\n" + data.error);
+
+                if (data.error) {
+                    alert("エラー: " + data.error + (data.message ? "\n" + data.message : ""));
                 } else {
-                    document.getElementById('out_t').innerText = data.translation;
-                    document.getElementById('out_i').innerText = data.ipa;
-                    document.getElementById('out_k').innerText = data.katakana;
+                    // ✅ APIのJSONキーと一致させた
+                    document.getElementById('out_t').innerText = data.translation ?? "－";
+                    document.getElementById('out_i').innerText = data.ipa ?? "－";
+                    document.getElementById('out_k').innerText = data.katakana ?? "－";
                     document.getElementById('out').style.display = 'block';
                 }
             } catch (e) {
-                alert("サーバーへの接続に失敗しました。最新のコードが反映されているか確認してください。");
+                alert("サーバーへの接続に失敗しました。\n" + e.message);
             } finally {
                 btn.disabled = false;
                 btn.textContent = "変換する";
