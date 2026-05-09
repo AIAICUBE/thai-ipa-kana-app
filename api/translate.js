@@ -1,13 +1,18 @@
 export default async function handler(req, res) {
-  if (req.method !== 'POST') return res.status(405).json({ error: 'Method Not Allowed' });
+  // ブラウザからのアクセスを許可
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+  if (req.method === 'OPTIONS') return res.status(200).end();
 
   try {
-    const { text } = req.body;
+    const { text } = await req.body;
     const apiKey = process.env.GEMINI_API_KEY?.trim();
 
     if (!apiKey) return res.status(200).json({ error: 'APIキーが設定されていません。' });
 
-    // タイ語は分かち書きがないため、AIによる文脈判断が非常に有効です
+    // タイ語は分かち書きがないため、AIに文脈に応じた分割を依頼します
     const prompt = `あなたはタイ語と言語学の専門家です。
 以下のテキストを翻訳し、IPA、独自のカタカナ表記をJSONで出力してください。
 入力: "${text}"
@@ -28,11 +33,15 @@ export default async function handler(req, res) {
     const data = await response.json();
     if (data.error) return res.status(200).json({ error: data.error.message });
 
-    let result = data.candidates[0].content.parts[0].text.replace(/```json|
+    // AIの返答からJSONを抽出
+    let result = data.candidates[0].content.parts[0].text;
+    const cleanJson = result.replace(/```json/g, '').replace(/
 ```/g, '').trim();
-    return res.status(200).json(JSON.parse(result));
+    
+    return res.status(200).json(JSON.parse(cleanJson));
 
   } catch (err) {
-    return res.status(200).json({ error: 'System Error: ' + err.message });
+    // 500エラーで沈黙するのを防ぐため、200でエラー内容を返します
+    return res.status(200).json({ error: 'サーバー内部エラー: ' + err.message });
   }
 }
