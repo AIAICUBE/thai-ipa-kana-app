@@ -12,9 +12,7 @@ export default async function handler(req, res) {
     if (!apiKey) return res.status(200).json({ error: "APIキーが設定されていません。" });
 
     const prompt = `あなたはタイ語と言語学の専門家です。
-入力された文字列のみを厳密に解析してください。
-丁寧語の「ครับ/ค่ะ」などは、入力に含まれていない限り絶対に追加しないでください。
-解析結果は、以下のJSONスキーマのみを返してください。
+タイ語は分かち書きがないため、適切に単語を分割して解析し、以下のJSONスキーマのみを返してください。
 
 スキーマ:
 {
@@ -31,6 +29,8 @@ export default async function handler(req, res) {
 
 入力テキスト: ${text}`;
 
+    // ✅ Fix1: 正しいモデル名 gemini-2.5-flash（安定版GA）
+    // ✅ Fix2: 正しいエンドポイント v1beta（v1ではない）
     const response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
       {
@@ -57,11 +57,11 @@ export default async function handler(req, res) {
     const resultText = data.candidates?.[0]?.content?.parts?.[0]?.text;
     if (!resultText) throw new Error("AIの応答が空です");
 
+    // ✅ Fix3: パース失敗時のフォールバック付き
     try {
       return res.status(200).json(JSON.parse(resultText));
     } catch {
-      const match = resultText.match(/```(?:json)?\s*([\s\S]*?)
-```/);
+      const match = resultText.match(/```(?:json)?\s*([\s\S]*?)```/);
       return res.status(200).json(JSON.parse(match ? match[1].trim() : resultText.trim()));
     }
 
