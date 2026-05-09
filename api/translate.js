@@ -12,7 +12,7 @@ export default async function handler(req, res) {
     if (!apiKey) return res.status(200).json({ error: "APIキーが設定されていません。" });
 
     const prompt = `あなたはタイ語と言語学の専門家です。
-以下のテキストを分析し、必ず指定のJSONスキーマのみを返してください。説明文やコードブロックは一切不要です。
+以下のテキストを分析し、必ず指定のJSONスキーマのみを返してください。
 
 スキーマ:
 {
@@ -29,27 +29,37 @@ export default async function handler(req, res) {
 
 入力テキスト: ${text}`;
 
+    // ✅ 2026年最新の v1 エンドポイントと Gemini 3 Flash モデルに修正
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1/models/gemini-3-flash:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           contents: [{ parts: [{ text: prompt }] }],
           generationConfig: {
-            responseMimeType: "application/json" // ✅ これが勝利の鍵
+            responseMimeType: "application/json"
           }
         })
       }
     );
 
     const data = await response.json();
-    if (data.error) return res.status(200).json({ error: data.error.message });
+
+    // Google API 側でエラーが出た場合に詳細を表示する
+    if (data.error) {
+      return res.status(200).json({ 
+        error: "Google APIエラー", 
+        message: data.error.message 
+      });
+    }
 
     const resultText = data.candidates?.[0]?.content?.parts?.[0]?.text;
-    return res.status(200).json(JSON.parse(resultText || "{}"));
+    if (!resultText) throw new Error("AIからの応答が空です");
+
+    return res.status(200).json(JSON.parse(resultText));
 
   } catch (err) {
-    return res.status(200).json({ error: "サーバーエラー", message: err.message });
+    return res.status(200).json({ error: "実行エラー", message: err.message });
   }
 }
