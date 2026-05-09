@@ -9,10 +9,10 @@ export default async function handler(req, res) {
     const { text } = req.body;
     const apiKey = process.env.GEMINI_API_KEY?.trim();
 
-    if (!apiKey) return res.status(200).json({ error: "APIキーが設定されていません。" });
+    if (!apiKey) return res.status(200).json({ error: "APIキー未設定" });
 
-    const prompt = `あなたはタイ語と言語学の専門家です。
-以下のテキストを分析し、必ず指定のJSONスキーマのみを返してください。
+    const prompt = `タイ語解析エキスパートとして動作してください。
+入力テキストを分析し、必ず指定のJSONスキーマのみを返してください。説明は一切不要です。
 
 スキーマ:
 {
@@ -20,18 +20,18 @@ export default async function handler(req, res) {
   "words": [
     {
       "thai": "タイ語単語",
-      "reading": "カタカナ（平声:→, 高声:↑, 低声:↓, 下がる:↘, 上がる:↗, 長音:〜）",
-      "ipa": "IPA表記",
+      "reading": "読み（平声:→, 高声:↑, 低声:↓, 下がる:↘, 上がる:↗, 長音:〜）",
+      "ipa": "IPA",
       "meaning": "意味"
     }
   ]
 }
 
-入力テキスト: ${text}`;
+入力: ${text}`;
 
-    // ✅ 2026年最新の v1 エンドポイントと Gemini 3 Flash モデルに修正
+    // ✅ v1beta を使用し、モデル名を確実に存在する 1.5-flash に固定します
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1/models/gemini-3-flash:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -46,8 +46,8 @@ export default async function handler(req, res) {
 
     const data = await response.json();
 
-    // Google API 側でエラーが出た場合に詳細を表示する
     if (data.error) {
+      // 💡 ここが重要：単に「エラー」と返すのではなく、Googleが言ってきた「理由」をフロントに渡します
       return res.status(200).json({ 
         error: "Google APIエラー", 
         message: data.error.message 
@@ -55,11 +55,9 @@ export default async function handler(req, res) {
     }
 
     const resultText = data.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (!resultText) throw new Error("AIからの応答が空です");
-
-    return res.status(200).json(JSON.parse(resultText));
+    return res.status(200).json(JSON.parse(resultText || "{}"));
 
   } catch (err) {
-    return res.status(200).json({ error: "実行エラー", message: err.message });
+    return res.status(200).json({ error: "サーバーエラー", message: err.message });
   }
 }
