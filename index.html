@@ -3,26 +3,97 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>タイ語解析ツール</title>
+    <title>タイ語・日本語 解析ツール</title>
     <style>
-        body { font-family: sans-serif; padding: 20px; background: #f4f7f6; color: #333; }
-        .box { max-width: 600px; margin: 0 auto; background: #fff; padding: 25px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); }
-        textarea { width: 100%; height: 100px; padding: 12px; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; font-size: 16px; }
-        button { width: 100%; padding: 15px; background: #00b894; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 16px; font-weight: bold; margin-top: 10px; }
-        button:disabled { background: #ccc; }
-        .res-box { margin-top: 25px; display: none; border-top: 2px solid #eee; padding-top: 20px; }
-        .word-card { background: #f9f9f9; padding: 10px; margin-bottom: 10px; border-radius: 6px; border-left: 4px solid #00b894; }
-        .thai-text { font-size: 20px; color: #2d3436; font-weight: bold; }
+        /* 全体的なレイアウト */
+        body { font-family: 'Helvetica Neue', Arial, sans-serif; padding: 20px; background: #f0f2f5; color: #333; line-height: 1.6; }
+        
+        /* 枠（box）: heightを指定せず、中身に合わせて伸びるようにします */
+        .box { 
+            max-width: 600px; 
+            margin: 0 auto; 
+            background: #fff; 
+            padding: 30px; 
+            border-radius: 16px; 
+            box-shadow: 0 10px 25px rgba(0,0,0,0.05);
+            min-height: 300px; /* 最低限の高さ */
+            height: auto;      /* 内容量に応じて自動で伸びる */
+        }
+
+        h2 { text-align: center; color: #2d3436; margin-bottom: 25px; }
+        
+        textarea { 
+            width: 100%; 
+            height: 120px; 
+            padding: 15px; 
+            border: 2px solid #e0e0e0; 
+            border-radius: 10px; 
+            box-sizing: border-box; 
+            font-size: 16px; 
+            transition: border-color 0.3s;
+            resize: vertical; /* ユーザーが手動で広げることも可能 */
+        }
+        textarea:focus { border-color: #00b894; outline: none; }
+
+        button { 
+            width: 100%; 
+            padding: 15px; 
+            background: #00b894; 
+            color: white; 
+            border: none; 
+            border-radius: 10px; 
+            cursor: pointer; 
+            font-size: 18px; 
+            font-weight: bold; 
+            margin-top: 15px; 
+            transition: background 0.3s;
+        }
+        button:hover { background: #00947a; }
+        button:disabled { background: #b2bec3; cursor: not-allowed; }
+
+        /* 結果表示エリア */
+        .res-box { 
+            margin-top: 30px; 
+            display: none; 
+            border-top: 1px solid #eee; 
+            padding-top: 20px;
+            animation: fadeIn 0.5s ease; /* パッと出るアニメーション */
+        }
+
+        .main-translation { 
+            font-size: 20px; 
+            font-weight: bold; 
+            color: #2d3436; 
+            margin-bottom: 20px;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+
+        /* 単語カードのデザイン */
+        .word-card { 
+            background: #fff; 
+            padding: 15px; 
+            margin-bottom: 12px; 
+            border-radius: 10px; 
+            border: 1px solid #eee;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.02);
+        }
+        .thai-text { font-size: 24px; color: #00b894; font-weight: bold; margin-bottom: 5px; }
+        .reading-text { color: #636e72; font-size: 14px; margin-bottom: 5px; }
+        .meaning-text { font-size: 16px; color: #2d3436; }
+
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
     </style>
 </head>
 <body>
     <div class="box">
         <h2>タイ語 ⇄ 日本語 翻訳解析</h2>
-        <textarea id="input" placeholder="タイ語を入力してください..."></textarea>
+        <textarea id="input" placeholder="タイ語の文章を入力してください..."></textarea>
         <button id="btn" onclick="run()">解析する</button>
 
         <div id="result" class="res-box">
-            <h3 id="main-trans"></h3>
+            <div id="main-trans" class="main-translation"></div>
             <div id="word-list"></div>
         </div>
     </div>
@@ -30,11 +101,13 @@
     <script>
         async function run() {
             const btn = document.getElementById('btn');
-            const text = document.getElementById('input').value.trim();
+            const input = document.getElementById('input');
+            const text = input.value.trim();
             if(!text) return;
 
-            btn.disabled = true; btn.textContent = "解析中...";
-            document.getElementById('result').style.display = 'none';
+            btn.disabled = true; btn.textContent = "考え中...";
+            const resultArea = document.getElementById('result');
+            resultArea.style.display = 'none';
 
             try {
                 const res = await fetch('/api/translate', {
@@ -43,22 +116,29 @@
                     body: JSON.stringify({ text })
                 });
                 const data = await res.json();
-                if(data.error) throw new Error(data.error);
-
-                document.getElementById('main-trans').innerText = "全体訳: " + data.translation;
-                const list = document.getElementById('word-list');
-                list.innerHTML = "";
                 
-                data.words.forEach(w => {
-                    list.innerHTML += `<div class="word-card">
+                if(data.error) throw new Error(data.error + (data.message ? ": " + data.message : ""));
+
+                // 全体訳を表示
+                document.getElementById('main-trans').innerText = "全体訳: " + data.translation;
+                
+                // 単語リストを生成
+                const list = document.getElementById('word-list');
+                list.innerHTML = data.words.map(w => `
+                    <div class="word-card">
                         <div class="thai-text">${w.thai}</div>
-                        <div>読み: ${w.reading} | IPA: ${w.ipa}</div>
-                        <div>意味: ${w.meaning}</div>
-                    </div>`;
-                });
-                document.getElementById('result').style.display = 'block';
-            } catch (e) { alert("エラー: " + e.message); }
-            finally { btn.disabled = false; btn.textContent = "解析する"; }
+                        <div class="reading-text">読み: ${w.reading} | IPA: ${w.ipa}</div>
+                        <div class="meaning-text">${w.meaning}</div>
+                    </div>
+                `).join('');
+                
+                // 最後に表示
+                resultArea.style.display = 'block';
+            } catch (e) { 
+                alert("エラーが発生しました\n" + e.message); 
+            } finally { 
+                btn.disabled = false; btn.textContent = "解析する"; 
+            }
         }
     </script>
 </body>
