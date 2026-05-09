@@ -9,18 +9,22 @@ export default async function handler(req, res) {
     const { text } = req.body;
     const apiKey = process.env.GEMINI_API_KEY?.trim();
 
-    if (!apiKey) {
-      return res.status(200).json({ error: "APIキーが設定されていません。" });
-    }
+    if (!apiKey) return res.status(200).json({ error: "APIキーが設定されていません。" });
 
-    // ✅ キー名を明示してindex.htmlと一致させる
     const prompt = `あなたはタイ語と言語学の専門家です。
-以下のテキストを分析し、必ず下記JSONだけを返してください。説明文・マークダウン・コードブロックは不要です。
+以下のテキストを分析し、必ず指定のJSONスキーマのみを返してください。説明文やコードブロックは一切不要です。
 
+スキーマ:
 {
-  "translation": "日本語訳",
-  "ipa": "文全体のIPA表記",
-  "katakana": "声調記号付きカタカナ読み（平声:→ 高声:↑ 低声:↓ 下がる:↘ 上がる:↗ 長音:〜）"
+  "translation": "全体の日本語訳",
+  "words": [
+    {
+      "thai": "タイ語単語",
+      "reading": "カタカナ（平声:→, 高声:↑, 低声:↓, 下がる:↘, 上がる:↗, 長音:〜）",
+      "ipa": "IPA表記",
+      "meaning": "意味"
+    }
+  ]
 }
 
 入力テキスト: ${text}`;
@@ -32,34 +36,20 @@ export default async function handler(req, res) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: { responseMimeType: "application/json" } // ✅ JSONのみ返すよう強制
+          generationConfig: {
+            responseMimeType: "application/json" // ✅ これが勝利の鍵
+          }
         })
       }
     );
 
     const data = await response.json();
-
-    if (data.error) {
-      return res.status(200).json({ error: data.error.message });
-    }
+    if (data.error) return res.status(200).json({ error: data.error.message });
 
     const resultText = data.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (!resultText) {
-      return res.status(200).json({ error: "Geminiからレスポンスが取得できませんでした。" });
-    }
-
-    // ✅ パース失敗時のフォールバック付き
-    try {
-      return res.status(200).json(JSON.parse(resultText));
-    } catch {
-      const match = resultText.match(/```(?:json)?\s*([\s\S]*?)```/);
-      return res.status(200).json(JSON.parse(match ? match[1].trim() : resultText.trim()));
-    }
+    return res.status(200).json(JSON.parse(resultText || "{}"));
 
   } catch (err) {
-    return res.status(200).json({
-      error: "サーバー内部でエラーが発生しました",
-      message: err.message
-    });
+    return res.status(200).json({ error: "サーバーエラー", message: err.message });
   }
 }
