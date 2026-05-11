@@ -65,9 +65,3 @@ export default async function handler(req, res) {
     } catch {
       const match = resultText.match(/
 http://googleusercontent.com/immersive_entry_chip/0
-
-### 反映方法
-1. GitHubの `api/translate.js` と `index.html` を上記のコードに書き換えます。
-2. 完了後、Vercelで自動デプロイされるのを待ちます。
-
-これで、入力したテキスト全体のIPAと声調付きカタカナが、意味と一緒に一番上の青い枠に表示されるようになります！
