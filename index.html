@@ -1,67 +1,144 @@
-export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>タイ語 解析・発音ツール</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f0f2f5; color: #333; }
+        .box { 
+            max-width: 500px; margin: 0 auto; background: #fff; padding: 25px; 
+            border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); height: auto;
+        }
+        h2 { font-size: 1.2rem; margin-bottom: 20px; color: #2d3436; text-align: center; }
+        
+        .input-group { position: relative; }
+        textarea { 
+            width: 100%; height: 100px; padding: 12px; border: 1px solid #ddd; 
+            border-radius: 8px; box-sizing: border-box; font-size: 18px; 
+        }
+        
+        .speak-btn {
+            background: none; border: none; cursor: pointer; font-size: 20px;
+            padding: 5px; color: #3498db; vertical-align: middle;
+        }
+        .speak-btn:hover { color: #2980b9; }
 
-  if (req.method === 'OPTIONS') return res.status(200).end();
+        button#main-btn { 
+            width: 100%; padding: 15px; background: #00b894; color: white; 
+            border: none; border-radius: 8px; cursor: pointer; 
+            font-size: 16px; font-weight: bold; margin-top: 10px;
+        }
+        button:disabled { background: #ccc; }
 
-  try {
-    const { text } = req.body;
-    const apiKey = process.env.GEMINI_API_KEY?.trim();
+        .res-box { margin-top: 20px; border-top: 1px solid #eee; padding-top: 20px; display: none; }
+        
+        .full-result { background: #e8f4f8; padding: 15px; border-radius: 8px; margin-bottom: 20px; border-left: 5px solid #3498db; }
+        .full-result .title-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+        .full-result .trans-text { font-size: 22px; font-weight: bold; color: #2c3e50; }
+        .full-result .detail-text { margin: 5px 0; color: #555; line-height: 1.4; font-size: 14px; }
+        
+        .word-card { background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 10px; border-left: 4px solid #00b894; }
+        .thai-text { font-size: 24px; font-weight: bold; color: #00b894; display: inline-block; }
+        .info { margin: 5px 0; color: #666; font-size: 14px; }
+    </style>
+</head>
+<body>
+    <div class="box">
+        <h2>タイ語 解析・発音ツール</h2>
+        
+        <div class="input-group">
+            <textarea id="input" placeholder="タイ語または日本語を入力..."></textarea>
+            <div style="text-align: right; margin-top: 5px;">
+                <span style="font-size: 12px; color: #888;">入力の発音：</span>
+                <button class="speak-btn" onclick="speakInput()">🔊</button>
+            </div>
+        </div>
 
-    if (!apiKey) return res.status(200).json({ error: "APIキーが設定されていません。" });
+        <button id="main-btn" onclick="run()">解析・翻訳する</button>
 
-    const prompt = `あなたはタイ語と言語学の専門家です。
-入力された文字列が日本語ならタイ語へ、タイ語なら日本語へ翻訳してください。
-丁寧語の「ครับ/ค่ะ」などは、入力に含まれていない限り絶対に追加しないでください。
-必ず以下のJSONスキーマのみを返してください。
+        <div id="result" class="res-box">
+            <div class="full-result">
+                <div class="title-row">
+                    <span id="full-trans" class="trans-text"></span>
+                    <button id="speak-output-btn" class="speak-btn">🔊</button>
+                </div>
+                <div class="detail-text"><strong>IPA:</strong> <span id="full-ipa"></span></div>
+                <div class="detail-text"><strong>カタカナ:</strong> <span id="full-katakana"></span></div>
+            </div>
+            
+            <div id="word-list"></div>
+        </div>
+    </div>
 
-スキーマ:
-{
-  "full_translation": "翻訳後の文章全体（単語ではなく一つの文として）",
-  "full_ipa": "文全体のIPA表記",
-  "full_katakana": "文全体のカタカナ表記（平声:→, 高声:↑, 低声:↓, 下がる:↘, 上がる:↗, 長音:〜）",
-  "source_lang": "入力言語 (ja か th)",
-  "target_lang": "翻訳後言語 (ja か th)",
-  "words": [
-    {
-      "thai": "タイ語単語",
-      "reading": "カタカナ（声調記号付き）",
-      "ipa": "IPA",
-      "meaning": "意味"
-    }
-  ]
-}
+    <script>
+        let currentResult = null;
 
-入力テキスト: ${text}`;
+        // ブラウザの音声合成を使用して喋る関数
+        function speak(text, lang) {
+            if (!window.speechSynthesis) return alert("このブラウザは音声合成に対応していません");
+            window.speechSynthesis.cancel(); // 前の再生を止める
+            const uttr = new SpeechSynthesisUtterance(text);
+            uttr.lang = lang === 'th' ? 'th-TH' : 'ja-JP';
+            uttr.rate = 0.9; // 少しゆっくり
+            window.speechSynthesis.speak(uttr);
+        }
 
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: {
-            responseMimeType: "application/json"
-          }
-        })
-      }
-    );
+        function speakInput() {
+            const text = document.getElementById('input').value.trim();
+            if (!text) return;
+            // 簡易的に文字コードでタイ語か判定
+            const isThai = /[\u0E00-\u0E7F]/.test(text);
+            speak(text, isThai ? 'th' : 'ja');
+        }
 
-    const data = await response.json();
+        async function run() {
+            const btn = document.getElementById('main-btn');
+            const text = document.getElementById('input').value.trim();
+            if(!text) return;
 
-    if (data.error) {
-      return res.status(200).json({
-        error: "Google APIエラー",
-        detail: data.error.message || "原因不明のエラー"
-      });
-    }
+            btn.disabled = true; btn.textContent = "解析中...";
+            document.getElementById('result').style.display = 'none';
 
-    const resultText = data.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (!resultText) throw new Error("AIの応答が空です");
+            try {
+                const res = await fetch('/api/translate', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ text })
+                });
+                const data = await res.json();
+                if(data.error) throw new Error(data.error + (data.detail ? ": " + data.detail : ""));
 
-    try {
-      return res.status(200).json(JSON.parse(resultText));
-    } catch {
-      const match = resultText.match(/
+                currentResult = data;
+
+                // 結果のセット
+                document.getElementById('full-trans').innerText = data.full_translation;
+                document.getElementById('full-ipa').innerText = data.full_ipa;
+                document.getElementById('full-katakana').innerText = data.full_katakana;
+
+                // スピーカーボタンのイベント設定
+                document.getElementById('speak-output-btn').onclick = () => {
+                    speak(data.full_translation, data.target_lang);
+                };
+
+                const list = document.getElementById('word-list');
+                list.innerHTML = data.words.map(w => `
+                    <div class="word-card">
+                        <div class="thai-text">${w.thai}</div>
+                        <button class="speak-btn" onclick="speak('${w.thai}', 'th')">🔊</button>
+                        <div class="info"><strong>読み:</strong> ${w.reading}</div>
+                        <div class="info"><strong>IPA:</strong> ${w.ipa}</div>
+                        <div style="margin-top:10px;">${w.meaning}</div>
+                    </div>
+                `).join('');
+                
+                document.getElementById('result').style.display = 'block';
+            } catch (e) { 
+                alert("エラーが発生しました\n" + e.message); 
+            } finally { 
+                btn.disabled = false; btn.textContent = "解析・翻訳する"; 
+            }
+        }
+    </script>
+</body>
+</html>
