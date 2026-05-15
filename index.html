@@ -32,7 +32,7 @@
         }
         .res-box { margin-top: 25px; border-top: 2px solid #eee; padding-top: 20px; display: none; }
         
-        /* 全文カードの修正 */
+        /* 全文カード */
         .full-card { 
             background: #e8f4f8; 
             padding: 15px; 
@@ -44,7 +44,7 @@
             font-size: 22px; 
             font-weight: bold; 
             color: #2c3e50; 
-            word-break: break-all; /* 長い単語を強制的に改行 */
+            word-break: break-all; 
         }
         .detail-line { 
             margin-top: 10px; 
@@ -53,7 +53,7 @@
             border-top: 1px solid #d4e6f1; 
             padding-top: 8px; 
             line-height: 1.6; 
-            word-break: break-all; /* IPAやカナの漏れ出しを防止 */
+            word-break: break-all; 
         }
         .ipa-text { 
             font-family: 'Courier New', monospace; 
@@ -62,7 +62,7 @@
             word-break: break-all; 
         }
 
-        /* 単語カードの修正 */
+        /* 単語カード */
         .word-card { 
             background: #f8f9fa; 
             padding: 15px; 
@@ -100,27 +100,47 @@
         </div>
     </div>
     <script>
+        // 音声リストを保持する変数
+        let voices = [];
+
+        function loadVoices() {
+            voices = window.speechSynthesis.getVoices();
+        }
+
+        // 音声読み込みの待機
+        window.speechSynthesis.onvoiceschanged = loadVoices;
+        loadVoices();
+
         function speak(text, lang) {
             if (!window.speechSynthesis) return;
+            
+            // 再生中の音声を止める
             window.speechSynthesis.cancel();
             
             const uttr = new SpeechSynthesisUtterance(text);
             const targetLang = lang === 'th' ? 'th-TH' : 'ja-JP';
+            uttr.lang = targetLang;
+
+            // 音声リストが空の場合は再取得を試みる
+            if (voices.length === 0) loadVoices();
             
-            const voices = window.speechSynthesis.getVoices();
-            const bestVoice = voices.find(v => v.lang === targetLang && v.name.includes('Google')) ||
+            // Mac/iOS用の優先順位: 1. Google (高品質) 2. Siri 3. Kanya 4. その他タイ語
+            let bestVoice = voices.find(v => v.lang === targetLang && v.name.includes('Google')) ||
+                              voices.find(v => v.lang === targetLang && v.name.includes('Siri')) ||
+                              voices.find(v => v.lang === targetLang && v.name.includes('Kanya')) ||
                               voices.find(v => v.lang === targetLang && v.name.includes('Natural')) ||
                               voices.find(v => v.lang === targetLang);
             
-            if (bestVoice) uttr.voice = bestVoice;
+            if (bestVoice) {
+                uttr.voice = bestVoice;
+            }
+
             uttr.rate = 0.9;
             uttr.pitch = 1.0;
+            
+            // Safariなどのためのバグ対策: 発話を開始
             window.speechSynthesis.speak(uttr);
         }
-
-        window.speechSynthesis.onvoiceschanged = () => {
-            window.speechSynthesis.getVoices();
-        };
 
         function speakInput() {
             const text = document.getElementById('input').value.trim();
@@ -147,6 +167,8 @@
                 document.getElementById('full-trans').innerText = data.full_translation;
                 document.getElementById('full-ipa').innerText = data.full_ipa;
                 document.getElementById('full-katakana').innerText = data.full_katakana;
+                
+                // 翻訳後の音声再生ボタン
                 document.getElementById('speak-output-btn').onclick = () => {
                     speak(data.full_translation, data.target_lang);
                 };
