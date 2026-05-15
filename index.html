@@ -3,99 +3,84 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>タイ語 解析・発音ツール</title>
+    <title>タイ語 翻訳・発音解析ツール</title>
     <style>
         body { font-family: sans-serif; padding: 20px; background: #f0f2f5; color: #333; }
         .box { 
             max-width: 500px; margin: 0 auto; background: #fff; padding: 25px; 
             border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); height: auto;
         }
-        h2 { font-size: 1.2rem; margin-bottom: 20px; color: #2d3436; text-align: center; }
-        
-        .input-group { position: relative; }
+        h2 { font-size: 1.2rem; text-align: center; margin-bottom: 20px; }
         textarea { 
             width: 100%; height: 100px; padding: 12px; border: 1px solid #ddd; 
             border-radius: 8px; box-sizing: border-box; font-size: 18px; 
         }
-        
-        .speak-btn {
-            background: none; border: none; cursor: pointer; font-size: 20px;
-            padding: 5px; color: #3498db; vertical-align: middle;
-        }
-        .speak-btn:hover { color: #2980b9; }
-
-        button#main-btn { 
+        .btn-row { display: flex; justify-content: flex-end; align-items: center; gap: 8px; margin-top: 5px; }
+        .speak-btn { background: none; border: none; cursor: pointer; font-size: 24px; color: #3498db; }
+        #main-btn { 
             width: 100%; padding: 15px; background: #00b894; color: white; 
             border: none; border-radius: 8px; cursor: pointer; 
             font-size: 16px; font-weight: bold; margin-top: 10px;
         }
-        button:disabled { background: #ccc; }
-
-        .res-box { margin-top: 20px; border-top: 1px solid #eee; padding-top: 20px; display: none; }
-        
-        .full-result { background: #e8f4f8; padding: 15px; border-radius: 8px; margin-bottom: 20px; border-left: 5px solid #3498db; }
-        .full-result .title-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
-        .full-result .trans-text { font-size: 22px; font-weight: bold; color: #2c3e50; }
-        .full-result .detail-text { margin: 5px 0; color: #555; line-height: 1.4; font-size: 14px; }
-        
+        .res-box { margin-top: 25px; border-top: 1px solid #eee; padding-top: 20px; display: none; }
+        .full-card { background: #e8f4f8; padding: 15px; border-radius: 10px; margin-bottom: 20px; border-left: 5px solid #3498db; }
+        .full-text { font-size: 22px; font-weight: bold; color: #2c3e50; }
+        .detail-line { margin-top: 10px; font-size: 14px; color: #555; border-top: 1px solid #d4e6f1; padding-top: 8px; line-height: 1.5; }
         .word-card { background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 10px; border-left: 4px solid #00b894; }
-        .thai-text { font-size: 24px; font-weight: bold; color: #00b894; display: inline-block; }
-        .info { margin: 5px 0; color: #666; font-size: 14px; }
+        .thai-word { font-size: 24px; font-weight: bold; color: #00b894; }
     </style>
 </head>
 <body>
     <div class="box">
-        <h2>タイ語 解析・発音ツール</h2>
-        
-        <div class="input-group">
-            <textarea id="input" placeholder="タイ語または日本語を入力..."></textarea>
-            <div style="text-align: right; margin-top: 5px;">
-                <span style="font-size: 12px; color: #888;">入力の発音：</span>
-                <button class="speak-btn" onclick="speakInput()">🔊</button>
-            </div>
+        <h2>タイ語 翻訳・発音解析</h2>
+        <textarea id="input" placeholder="タイ語または日本語を入力..."></textarea>
+        <div class="btn-row">
+            <span style="font-size: 12px; color: #888;">入力の発音:</span>
+            <button class="speak-btn" onclick="speakInput()">🔊</button>
         </div>
 
         <button id="main-btn" onclick="run()">解析・翻訳する</button>
 
         <div id="result" class="res-box">
-            <div class="full-result">
-                <div class="title-row">
-                    <span id="full-trans" class="trans-text"></span>
+            <!-- 全文表示エリア -->
+            <div class="full-card">
+                <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+                    <span id="full-trans" class="full-text"></span>
                     <button id="speak-output-btn" class="speak-btn">🔊</button>
                 </div>
-                <div class="detail-text"><strong>IPA:</strong> <span id="full-ipa"></span></div>
-                <div class="detail-text"><strong>カタカナ:</strong> <span id="full-katakana"></span></div>
+                <div class="detail-line"><strong>IPA全文:</strong> <br><span id="full-ipa"></span></div>
+                <div class="detail-line"><strong>カタカナ全文:</strong> <br><span id="full-katakana"></span></div>
             </div>
             
+            <!-- 単語解析エリア -->
             <div id="word-list"></div>
         </div>
     </div>
 
     <script>
-        let currentResult = null;
-
-        // ブラウザの音声合成を使用して喋る関数
+        // 音声再生 (Web Speech API)
         function speak(text, lang) {
-            if (!window.speechSynthesis) return alert("このブラウザは音声合成に対応していません");
-            window.speechSynthesis.cancel(); // 前の再生を止める
+            if (!window.speechSynthesis) return;
+            window.speechSynthesis.cancel();
             const uttr = new SpeechSynthesisUtterance(text);
             uttr.lang = lang === 'th' ? 'th-TH' : 'ja-JP';
-            uttr.rate = 0.9; // 少しゆっくり
+            uttr.rate = 0.9;
             window.speechSynthesis.speak(uttr);
         }
 
+        // 入力文字の判定と再生
         function speakInput() {
             const text = document.getElementById('input').value.trim();
             if (!text) return;
-            // 簡易的に文字コードでタイ語か判定
             const isThai = /[\u0E00-\u0E7F]/.test(text);
             speak(text, isThai ? 'th' : 'ja');
         }
 
+        // メイン実行処理
         async function run() {
             const btn = document.getElementById('main-btn');
-            const text = document.getElementById('input').value.trim();
-            if(!text) return;
+            const inputVal = document.getElementById('input').value.trim();
+            if(!inputVal) return;
 
             btn.disabled = true; btn.textContent = "解析中...";
             document.getElementById('result').style.display = 'none';
@@ -104,37 +89,40 @@
                 const res = await fetch('/api/translate', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ text })
+                    body: JSON.stringify({ text: inputVal })
                 });
                 const data = await res.json();
+                
                 if(data.error) throw new Error(data.error + (data.detail ? ": " + data.detail : ""));
 
-                currentResult = data;
-
-                // 結果のセット
+                // UI反映（全文データ）
                 document.getElementById('full-trans').innerText = data.full_translation;
                 document.getElementById('full-ipa').innerText = data.full_ipa;
                 document.getElementById('full-katakana').innerText = data.full_katakana;
 
-                // スピーカーボタンのイベント設定
+                // 翻訳後の全体読み上げボタン
                 document.getElementById('speak-output-btn').onclick = () => {
                     speak(data.full_translation, data.target_lang);
                 };
 
+                // 単語カードの生成
                 const list = document.getElementById('word-list');
                 list.innerHTML = data.words.map(w => `
                     <div class="word-card">
-                        <div class="thai-text">${w.thai}</div>
-                        <button class="speak-btn" onclick="speak('${w.thai}', 'th')">🔊</button>
-                        <div class="info"><strong>読み:</strong> ${w.reading}</div>
-                        <div class="info"><strong>IPA:</strong> ${w.ipa}</div>
-                        <div style="margin-top:10px;">${w.meaning}</div>
+                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                            <span class="thai-word">${w.thai}</span>
+                            <button class="speak-btn" onclick="speak('${w.thai}', 'th')">🔊</button>
+                        </div>
+                        <div style="color:#666; font-size:14px; margin-top:5px;">
+                            読み: ${w.reading} | IPA: ${w.ipa}
+                        </div>
+                        <div style="margin-top:8px;">${w.meaning}</div>
                     </div>
                 `).join('');
                 
                 document.getElementById('result').style.display = 'block';
             } catch (e) { 
-                alert("エラーが発生しました\n" + e.message); 
+                alert("エラーが発生しました: " + e.message); 
             } finally { 
                 btn.disabled = false; btn.textContent = "解析・翻訳する"; 
             }
