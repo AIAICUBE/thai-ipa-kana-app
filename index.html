@@ -1,145 +1,67 @@
-<!DOCTYPE html>
-<html lang="ja">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>タイ語・日本語 解析ツール</title>
-    <style>
-        /* 全体的なレイアウト */
-        body { font-family: 'Helvetica Neue', Arial, sans-serif; padding: 20px; background: #f0f2f5; color: #333; line-height: 1.6; }
-        
-        /* 枠（box）: heightを指定せず、中身に合わせて伸びるようにします */
-        .box { 
-            max-width: 600px; 
-            margin: 0 auto; 
-            background: #fff; 
-            padding: 30px; 
-            border-radius: 16px; 
-            box-shadow: 0 10px 25px rgba(0,0,0,0.05);
-            min-height: 300px; /* 最低限の高さ */
-            height: auto;      /* 内容量に応じて自動で伸びる */
-        }
+export default async function handler(req, res) {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
-        h2 { text-align: center; color: #2d3436; margin-bottom: 25px; }
-        
-        textarea { 
-            width: 100%; 
-            height: 120px; 
-            padding: 15px; 
-            border: 2px solid #e0e0e0; 
-            border-radius: 10px; 
-            box-sizing: border-box; 
-            font-size: 16px; 
-            transition: border-color 0.3s;
-            resize: vertical; /* ユーザーが手動で広げることも可能 */
-        }
-        textarea:focus { border-color: #00b894; outline: none; }
+  if (req.method === 'OPTIONS') return res.status(200).end();
 
-        button { 
-            width: 100%; 
-            padding: 15px; 
-            background: #00b894; 
-            color: white; 
-            border: none; 
-            border-radius: 10px; 
-            cursor: pointer; 
-            font-size: 18px; 
-            font-weight: bold; 
-            margin-top: 15px; 
-            transition: background 0.3s;
-        }
-        button:hover { background: #00947a; }
-        button:disabled { background: #b2bec3; cursor: not-allowed; }
+  try {
+    const { text } = req.body;
+    const apiKey = process.env.GEMINI_API_KEY?.trim();
 
-        /* 結果表示エリア */
-        .res-box { 
-            margin-top: 30px; 
-            display: none; 
-            border-top: 1px solid #eee; 
-            padding-top: 20px;
-            animation: fadeIn 0.5s ease; /* パッと出るアニメーション */
-        }
+    if (!apiKey) return res.status(200).json({ error: "APIキーが設定されていません。" });
 
-        .main-translation { 
-            font-size: 20px; 
-            font-weight: bold; 
-            color: #2d3436; 
-            margin-bottom: 20px;
-            padding: 10px;
-            background: #f8f9fa;
-            border-radius: 8px;
-        }
+    const prompt = `あなたはタイ語と言語学の専門家です。
+入力された文字列が日本語ならタイ語へ、タイ語なら日本語へ翻訳してください。
+丁寧語の「ครับ/ค่ะ」などは、入力に含まれていない限り絶対に追加しないでください。
+必ず以下のJSONスキーマのみを返してください。
 
-        /* 単語カードのデザイン */
-        .word-card { 
-            background: #fff; 
-            padding: 15px; 
-            margin-bottom: 12px; 
-            border-radius: 10px; 
-            border: 1px solid #eee;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.02);
-        }
-        .thai-text { font-size: 24px; color: #00b894; font-weight: bold; margin-bottom: 5px; }
-        .reading-text { color: #636e72; font-size: 14px; margin-bottom: 5px; }
-        .meaning-text { font-size: 16px; color: #2d3436; }
+スキーマ:
+{
+  "full_translation": "翻訳後の文章全体（単語ではなく一つの文として）",
+  "full_ipa": "文全体のIPA表記",
+  "full_katakana": "文全体のカタカナ表記（平声:→, 高声:↑, 低声:↓, 下がる:↘, 上がる:↗, 長音:〜）",
+  "source_lang": "入力言語 (ja か th)",
+  "target_lang": "翻訳後言語 (ja か th)",
+  "words": [
+    {
+      "thai": "タイ語単語",
+      "reading": "カタカナ（声調記号付き）",
+      "ipa": "IPA",
+      "meaning": "意味"
+    }
+  ]
+}
 
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-    </style>
-</head>
-<body>
-    <div class="box">
-        <h2>タイ語 ⇄ 日本語 翻訳解析</h2>
-        <textarea id="input" placeholder="タイ語の文章を入力してください..."></textarea>
-        <button id="btn" onclick="run()">解析する</button>
+入力テキスト: ${text}`;
 
-        <div id="result" class="res-box">
-            <div id="main-trans" class="main-translation"></div>
-            <div id="word-list"></div>
-        </div>
-    </div>
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: {
+            responseMimeType: "application/json"
+          }
+        })
+      }
+    );
 
-    <script>
-        async function run() {
-            const btn = document.getElementById('btn');
-            const input = document.getElementById('input');
-            const text = input.value.trim();
-            if(!text) return;
+    const data = await response.json();
 
-            btn.disabled = true; btn.textContent = "考え中...";
-            const resultArea = document.getElementById('result');
-            resultArea.style.display = 'none';
+    if (data.error) {
+      return res.status(200).json({
+        error: "Google APIエラー",
+        detail: data.error.message || "原因不明のエラー"
+      });
+    }
 
-            try {
-                const res = await fetch('/api/translate', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ text })
-                });
-                const data = await res.json();
-                
-                if(data.error) throw new Error(data.error + (data.message ? ": " + data.message : ""));
+    const resultText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!resultText) throw new Error("AIの応答が空です");
 
-                // 全体訳を表示
-                document.getElementById('main-trans').innerText = "全体訳: " + data.translation;
-                
-                // 単語リストを生成
-                const list = document.getElementById('word-list');
-                list.innerHTML = data.words.map(w => `
-                    <div class="word-card">
-                        <div class="thai-text">${w.thai}</div>
-                        <div class="reading-text">読み: ${w.reading} | IPA: ${w.ipa}</div>
-                        <div class="meaning-text">${w.meaning}</div>
-                    </div>
-                `).join('');
-                
-                // 最後に表示
-                resultArea.style.display = 'block';
-            } catch (e) { 
-                alert("エラーが発生しました\n" + e.message); 
-            } finally { 
-                btn.disabled = false; btn.textContent = "解析する"; 
-            }
-        }
-    </script>
-</body>
-</html>
+    try {
+      return res.status(200).json(JSON.parse(resultText));
+    } catch {
+      const match = resultText.match(/
