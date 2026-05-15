@@ -9,12 +9,14 @@
         .box { max-width: 500px; margin: 0 auto; background: #fff; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); height: auto; }
         h2 { font-size: 1.2rem; text-align: center; margin-bottom: 20px; }
         textarea { width: 100%; height: 100px; padding: 12px; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; font-size: 18px; }
-        .btn-row { display: flex; justify-content: flex-end; align-items: center; gap: 8px; margin-top: 5px; }
+        .btn-row { display: flex; justify-content: flex-end; align-items: center; gap: 10px; margin-top: 8px; }
         .speak-btn { background: none; border: none; cursor: pointer; font-size: 24px; color: #3498db; }
         #main-btn { width: 100%; padding: 15px; background: #00b894; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 16px; font-weight: bold; margin-top: 10px; }
-        .res-box { margin-top: 25px; border-top: 1px solid #eee; padding-top: 20px; display: none; }
+        .res-box { margin-top: 25px; border-top: 2px solid #eee; padding-top: 20px; display: none; }
         .full-card { background: #e8f4f8; padding: 15px; border-radius: 10px; margin-bottom: 20px; border-left: 5px solid #3498db; }
-        .detail-line { margin-top: 10px; font-size: 14px; color: #555; border-top: 1px solid #d4e6f1; padding-top: 8px; line-height: 1.5; }
+        .full-text { font-size: 22px; font-weight: bold; color: #2c3e50; }
+        .detail-line { margin-top: 10px; font-size: 15px; color: #444; border-top: 1px solid #d4e6f1; padding-top: 8px; line-height: 1.6; }
+        .ipa-text { font-family: 'Courier New', monospace; color: #e67e22; font-weight: bold; }
         .word-card { background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 10px; border-left: 4px solid #00b894; }
         .thai-word { font-size: 24px; font-weight: bold; color: #00b894; }
     </style>
@@ -30,12 +32,12 @@
         <button id="main-btn" onclick="run()">解析・翻訳する</button>
         <div id="result" class="res-box">
             <div class="full-card">
-                <div style="display:flex; justify-content:space-between; align-items:flex-start;">
-                    <span id="full-trans" style="font-size:22px; font-weight:bold; color:#2c3e50;"></span>
+                <div style="display:flex; justify-content:space-between;">
+                    <span id="full-trans" class="full-text"></span>
                     <button id="speak-output-btn" class="speak-btn">🔊</button>
                 </div>
-                <div class="detail-line"><strong>IPA全文:</strong> <br><span id="full-ipa"></span></div>
-                <div class="detail-line"><strong>カタカナ全文:</strong> <br><span id="full-katakana"></span></div>
+                <div class="detail-line"><strong>IPA全文:</strong><br><span id="full-ipa" class="ipa-text"></span></div>
+                <div class="detail-line"><strong>カタカナ全文:</strong><br><span id="full-katakana"></span></div>
             </div>
             <div id="word-list"></div>
         </div>
@@ -57,24 +59,26 @@
         }
         async function run() {
             const btn = document.getElementById('main-btn');
-            const inputVal = document.getElementById('input').value.trim();
-            if(!inputVal) return;
+            const text = document.getElementById('input').value.trim();
+            if(!text) return;
             btn.disabled = true; btn.textContent = "解析中...";
             document.getElementById('result').style.display = 'none';
             try {
                 const res = await fetch('/api/translate', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ text: inputVal })
+                    body: JSON.stringify({ text })
                 });
                 const data = await res.json();
                 if(data.error) throw new Error(data.error);
+
                 document.getElementById('full-trans').innerText = data.full_translation;
                 document.getElementById('full-ipa').innerText = data.full_ipa;
                 document.getElementById('full-katakana').innerText = data.full_katakana;
                 document.getElementById('speak-output-btn').onclick = () => {
                     speak(data.full_translation, data.target_lang);
                 };
+
                 const list = document.getElementById('word-list');
                 list.innerHTML = data.words.map(w => `
                     <div class="word-card">
@@ -82,7 +86,9 @@
                             <span class="thai-word">${w.thai}</span>
                             <button class="speak-btn" onclick="speak('${w.thai}', 'th')">🔊</button>
                         </div>
-                        <div style="color:#666; font-size:14px; margin-top:5px;">読み: ${w.reading} | IPA: ${w.ipa}</div>
+                        <div style="color:#666; font-size:14px; margin-top:5px;">
+                            読み: ${w.reading} | <span class="ipa-text">${w.ipa}</span>
+                        </div>
                         <div style="margin-top:8px;">${w.meaning}</div>
                     </div>
                 `).join('');
