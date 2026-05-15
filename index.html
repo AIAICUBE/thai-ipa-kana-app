@@ -100,51 +100,48 @@
         </div>
     </div>
     <script>
-        // 音声リストを保持する変数
-        let voices = [];
-
-        function loadVoices() {
-            voices = window.speechSynthesis.getVoices();
-        }
-
-        // 音声読み込みの待機
-        window.speechSynthesis.onvoiceschanged = loadVoices;
-        loadVoices();
-
+        // 音声を再生するメイン関数
         function speak(text, lang) {
             if (!window.speechSynthesis) return;
             
-            // 再生中の音声を止める
+            // 再生中の音声を強制停止
             window.speechSynthesis.cancel();
             
             const uttr = new SpeechSynthesisUtterance(text);
             const targetLang = lang === 'th' ? 'th-TH' : 'ja-JP';
             uttr.lang = targetLang;
 
-            // 音声リストが空の場合は再取得を試みる
-            if (voices.length === 0) loadVoices();
+            // 最新の音声リストを取得（デスクトップブラウザ対策）
+            const voices = window.speechSynthesis.getVoices();
             
-            // Mac/iOS用の優先順位: 1. Google (高品質) 2. Siri 3. Kanya 4. その他タイ語
+            // 高品質なタイ語音声を見つけるための詳細なフィルタリング
+            // 優先順位: 1.Google, 2.Premium/Natural, 3.Siri(Mac), 4.Kanya(Mac), 5.言語コード一致
             let bestVoice = voices.find(v => v.lang === targetLang && v.name.includes('Google')) ||
-                              voices.find(v => v.lang === targetLang && v.name.includes('Siri')) ||
-                              voices.find(v => v.lang === targetLang && v.name.includes('Kanya')) ||
-                              voices.find(v => v.lang === targetLang && v.name.includes('Natural')) ||
-                              voices.find(v => v.lang === targetLang);
+                            voices.find(v => v.lang === targetLang && (v.name.includes('Natural') || v.name.includes('Premium'))) ||
+                            voices.find(v => v.lang === targetLang && v.name.includes('Siri')) ||
+                            voices.find(v => v.lang === targetLang && v.name.includes('Kanya')) ||
+                            voices.find(v => v.lang === targetLang);
             
             if (bestVoice) {
                 uttr.voice = bestVoice;
             }
 
-            uttr.rate = 0.9;
+            uttr.rate = 0.9; // 聴き取りやすい速度
             uttr.pitch = 1.0;
             
-            // Safariなどのためのバグ対策: 発話を開始
+            // 再生開始
             window.speechSynthesis.speak(uttr);
+        }
+
+        // ブラウザの音声リストが更新されたときに備える
+        if (window.speechSynthesis.onvoiceschanged !== undefined) {
+            window.speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices();
         }
 
         function speakInput() {
             const text = document.getElementById('input').value.trim();
             if (!text) return;
+            // タイ文字が含まれているか判定
             const isThai = /[\u0E00-\u0E7F]/.test(text);
             speak(text, isThai ? 'th' : 'ja');
         }
@@ -153,8 +150,11 @@
             const btn = document.getElementById('main-btn');
             const text = document.getElementById('input').value.trim();
             if(!text) return;
-            btn.disabled = true; btn.textContent = "解析中...";
+
+            btn.disabled = true; 
+            btn.textContent = "解析中...";
             document.getElementById('result').style.display = 'none';
+
             try {
                 const res = await fetch('/api/translate', {
                     method: 'POST',
@@ -186,9 +186,14 @@
                         <div style="margin-top:8px;">${w.meaning}</div>
                     </div>
                 `).join('');
+                
                 document.getElementById('result').style.display = 'block';
-            } catch (e) { alert("エラー: " + e.message); }
-            finally { btn.disabled = false; btn.textContent = "解析・翻訳する"; }
+            } catch (e) { 
+                alert("エラーが発生しました: " + e.message); 
+            } finally { 
+                btn.disabled = false; 
+                btn.textContent = "解析・翻訳する"; 
+            }
         }
     </script>
 </body>
