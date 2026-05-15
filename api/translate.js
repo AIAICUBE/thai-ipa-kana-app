@@ -12,15 +12,21 @@ export default async function handler(req, res) {
     if (!apiKey) return res.status(200).json({ error: "APIキーが設定されていません。" });
 
     const prompt = `あなたはタイ語と言語学の専門家です。
-タイ語は分かち書きがないため、適切に単語を分割して解析し、以下のJSONスキーマのみを返してください。
+入力された文字列が日本語ならタイ語へ、タイ語なら日本語へ翻訳してください。
+丁寧語の「ครับ/ค่ะ」などは、入力に含まれていない限り絶対に追加しないでください。
+必ず以下のJSONスキーマのみを返してください。
 
 スキーマ:
 {
-  "translation": "全体の日本語訳",
+  "full_translation": "翻訳後の文章全体（単語ではなく一つの文として）",
+  "full_ipa": "文全体のIPA表記",
+  "full_katakana": "文全体のカタカナ表記（平声:→, 高声:↑, 低声:↓, 下がる:↘, 上がる:↗, 長音:〜）",
+  "source_lang": "入力言語 (ja か th)",
+  "target_lang": "翻訳後言語 (ja か th)",
   "words": [
     {
       "thai": "タイ語単語",
-      "reading": "カタカナ（平声:→, 高声:↑, 低声:↓, 下がる:↘, 上がる:↗, 長音:〜）",
+      "reading": "カタカナ（声調記号付き）",
       "ipa": "IPA",
       "meaning": "意味"
     }
@@ -29,8 +35,6 @@ export default async function handler(req, res) {
 
 入力テキスト: ${text}`;
 
-    // ✅ Fix1: 正しいモデル名 gemini-2.5-flash（安定版GA）
-    // ✅ Fix2: 正しいエンドポイント v1beta（v1ではない）
     const response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
       {
@@ -57,15 +61,7 @@ export default async function handler(req, res) {
     const resultText = data.candidates?.[0]?.content?.parts?.[0]?.text;
     if (!resultText) throw new Error("AIの応答が空です");
 
-    // ✅ Fix3: パース失敗時のフォールバック付き
     try {
       return res.status(200).json(JSON.parse(resultText));
     } catch {
-      const match = resultText.match(/```(?:json)?\s*([\s\S]*?)```/);
-      return res.status(200).json(JSON.parse(match ? match[1].trim() : resultText.trim()));
-    }
-
-  } catch (err) {
-    return res.status(200).json({ error: "サーバー処理エラー", detail: err.message });
-  }
-}
+      const match = resultText.match(/
