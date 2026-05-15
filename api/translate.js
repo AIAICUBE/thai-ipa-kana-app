@@ -18,9 +18,11 @@ export default async function handler(req, res) {
 
 スキーマ:
 {
-  "translation": "翻訳後の文章全体",
+  "full_translation": "翻訳後の文章全体",
   "full_ipa": "翻訳後テキスト全体のIPA表記",
   "full_katakana": "翻訳後テキスト全体のカタカナ表記（平声:→, 高声:↑, 低声:↓, 下がる:↘, 上がる:↗, 長音:〜）",
+  "source_lang": "入力言語 (ja か th)",
+  "target_lang": "翻訳後言語 (ja か th)",
   "words": [
     {
       "thai": "タイ語単語",
@@ -54,4 +56,11 @@ export default async function handler(req, res) {
     try {
       return res.status(200).json(JSON.parse(resultText));
     } catch {
-      const match = resultText.match(/
+      const match = resultText.match(/```(?:json)?\s*([\s\S]*?)```/);
+      const cleanJson = match ? match[1].trim() : resultText.trim();
+      return res.status(200).json(JSON.parse(cleanJson));
+    }
+  } catch (err) {
+    return res.status(200).json({ error: "エラー", detail: err.message });
+  }
+}

@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "Thai-Japanese translation and analysis tool",
   "main": "index.html",
+  "type": "module",
   "private": true,
   "engines": {
     "node": "20.x"
