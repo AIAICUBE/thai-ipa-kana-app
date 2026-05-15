@@ -10,7 +10,8 @@
         h2 { font-size: 1.2rem; text-align: center; margin-bottom: 20px; }
         textarea { width: 100%; height: 100px; padding: 12px; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; font-size: 18px; }
         .btn-row { display: flex; justify-content: flex-end; align-items: center; gap: 10px; margin-top: 8px; }
-        .speak-btn { background: none; border: none; cursor: pointer; font-size: 24px; color: #3498db; }
+        .speak-btn { background: none; border: none; cursor: pointer; font-size: 24px; color: #3498db; transition: opacity 0.2s; }
+        .speak-btn:hover { opacity: 0.7; }
         #main-btn { width: 100%; padding: 15px; background: #00b894; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 16px; font-weight: bold; margin-top: 10px; }
         .res-box { margin-top: 25px; border-top: 2px solid #eee; padding-top: 20px; display: none; }
         .full-card { background: #e8f4f8; padding: 15px; border-radius: 10px; margin-bottom: 20px; border-left: 5px solid #3498db; }
@@ -43,20 +44,38 @@
         </div>
     </div>
     <script>
+        // 高品質な声（Google製やNatural）を優先的に選択して喋る
         function speak(text, lang) {
             if (!window.speechSynthesis) return;
             window.speechSynthesis.cancel();
+            
             const uttr = new SpeechSynthesisUtterance(text);
-            uttr.lang = lang === 'th' ? 'th-TH' : 'ja-JP';
+            const targetLang = lang === 'th' ? 'th-TH' : 'ja-JP';
+            
+            // 利用可能な声をすべて取得
+            const voices = window.speechSynthesis.getVoices();
+            
+            // 1. Google製の高品質な声を探す 2. 次に Natural と名の付く声を探す 3. なければ最初に見つかった言語一致の声
+            const bestVoice = voices.find(v => v.lang === targetLang && v.name.includes('Google')) ||
+                              voices.find(v => v.lang === targetLang && v.name.includes('Natural')) ||
+                              voices.find(v => v.lang === targetLang);
+            
+            if (bestVoice) uttr.voice = bestVoice;
             uttr.rate = 0.9;
+            uttr.pitch = 1.0;
             window.speechSynthesis.speak(uttr);
         }
+
+        // Chrome等で初動時に音声リストが空になる対策
+        window.speechSynthesis.getVoices();
+
         function speakInput() {
             const text = document.getElementById('input').value.trim();
             if (!text) return;
             const isThai = /[\u0E00-\u0E7F]/.test(text);
             speak(text, isThai ? 'th' : 'ja');
         }
+
         async function run() {
             const btn = document.getElementById('main-btn');
             const text = document.getElementById('input').value.trim();
@@ -99,3 +118,104 @@
     </script>
 </body>
 </html>
+```
+
+---
+
+### 📦 最新版 ZIPファイルのダウンロード
+上記の高品質音声ロジックを含め、IPAの可読性を上げた「正」となる最新ソースコードをZIPにまとめました。
+
+[📎 thai_translator_high_quality.zip をダウンロード](sandbox:/mnt/data/thai_translator_high_quality.zip)
+
+
+
+```python?code_reference&code_event_index=3
+import zipfile
+import os
+
+# 再度フォルダ作成
+os.makedirs('api', exist_ok=True)
+
+# 1. package.json
+package_json = """{
+  "name": "thai-translator",
+  "version": "1.2.0",
+  "main": "index.html",
+  "type": "module",
+  "private": true,
+  "engines": {
+    "node": "20.x"
+  }
+}"""
+
+# 2. api/translate.js (IPA可読性 & 500エラー対策)
+translate_js = """export default async function handler(req, res) {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  if (req.method === 'OPTIONS') return res.status(200).end();
+  try {
+    const { text } = req.body;
+    const apiKey = process.env.GEMINI_API_KEY?.trim();
+    if (!apiKey) return res.status(200).json({ error: "APIキー未設定" });
+    const prompt = `あなたはタイ語と言語学の専門家です。
+【IPAの人間用ルール】
+・音節間を必ずハイフン '-' で区切り、単語間は半角スペースを入れてください（例: [sa-wàt-dii]）。
+・全音節に声調記号(à, á, â, ǎ)を付けてください。
+【翻訳ルール】
+・日本語ならタイ語へ、タイ語なら日本語へ翻訳してください。
+・「ครับ/ค่ะ」は入力に無い限り絶対に追加しないでください。
+・解析結果は必ず以下のJSONのみを返してください。説明は不要です。
+スキーマ:
+{
+  "full_translation": "翻訳後文章",
+  "full_ipa": "音節区切りIPA [sa-wàt-dii]",
+  "full_katakana": "カナ全文",
+  "source_lang": "ja/th",
+  "target_lang": "ja/th",
+  "words": [{"thai":"語","reading":"カナ","ipa":"[sa-wàt]","meaning":"意味"}]
+}`;
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: { responseMimeType: "application/json" }
+        })
+      }
+    );
+    const data = await response.json();
+    if (data.error) return res.status(200).json({ error: data.error.message });
+    const resultText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    let jsonContent = resultText.trim();
+    if (jsonContent.includes('```
+
+[file-tag: code-generated-file-0-1778843003658856399]
+[file-tag: code-generated-file-0-1778843003658856399]
+[file-tag: code-generated-file-0-1778843003658856399]
+[file-tag: code-generated-file-0-1778843003658856399]
+[file-tag: code-generated-file-1-1778843003658861109]
+[file-tag: code-generated-file-2-1778843003658862969]
+')) {
+      jsonContent = jsonContent.split('```')[1].replace(/^json/, '').trim();
+    }
+    return res.status(200).json(JSON.parse(jsonContent));
+  } catch (err) {
+    return res.status(200).json({ error: "エラー", detail: err.message });
+  }
+}"""
+
+# 3. index.html (高品質音声ロジック)
+# (上のコードブロックと同じ内容)
+
+with open('package.json', 'w', encoding='utf-8') as f: f.write(package_json)
+with open('api/translate.js', 'w', encoding='utf-8') as f: f.write(translate_js)
+with open('index.html', 'w', encoding='utf-8') as f: f.write(index_html)
+
+zip_filename = 'thai_translator_high_quality.zip'
+with zipfile.ZipFile(zip_filename, 'w') as z:
+    z.write('package.json')
+    z.write('api/translate.js')
+    z.write('index.html')
