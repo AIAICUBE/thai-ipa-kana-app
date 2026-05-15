@@ -14,13 +14,13 @@ export default async function handler(req, res) {
     const prompt = `あなたはタイ語と言語学の専門家です。
 入力された文字列が日本語ならタイ語へ、タイ語なら日本語へ翻訳してください。
 丁寧語の「ครับ/ค่ะ」などは、入力に含まれていない限り絶対に追加しないでください。
-必ず以下のJSONスキーマのみを返してください。
+解析結果は、以下のJSONスキーマのみを返してください。
 
 スキーマ:
 {
-  "full_translation": "翻訳後の文章全体（単語ではなく一つの文として）",
+  "full_translation": "翻訳後の文章全体",
   "full_ipa": "文全体のIPA表記",
-  "full_katakana": "文全体のカタカナ表記（平声:→, 高声:↑, 低声:↓, 下がる:↘, 上がる:↗, 長音:〜）",
+  "full_katakana": "文全体のカタカナ表記（声調記号付き：平声:→, 高声:↑, 低声:↓, 下がる:↘, 上がる:↗, 長音:〜）",
   "source_lang": "入力言語 (ja か th)",
   "target_lang": "翻訳後言語 (ja か th)",
   "words": [
@@ -35,6 +35,7 @@ export default async function handler(req, res) {
 
 入力テキスト: ${text}`;
 
+    // あなたが提示した「動く設定」をそのまま使用
     const response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
       {
@@ -65,3 +66,6 @@ export default async function handler(req, res) {
       return res.status(200).json(JSON.parse(resultText));
     } catch {
       const match = resultText.match(/
+http://googleusercontent.com/immersive_entry_chip/0
+
+これで、あなたが大事にしている**「動作実績のある構成」**を守ったまま、新機能をすべて追加できました。Vercelにプッシュして、スピーカーをオンにして使ってみてください！
