@@ -1,12 +1,10 @@
 {
   "name": "thai-translator",
-  "version": "1.0.0",
-  "description": "Thai-Japanese translation and analysis tool",
+  "version": "1.4.0",
   "main": "index.html",
   "type": "module",
   "private": true,
   "engines": {
     "node": "20.x"
-  },
-  "dependencies": {}
+  }
 }
