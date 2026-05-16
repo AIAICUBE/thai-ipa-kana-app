@@ -79,12 +79,3 @@ export default async function handler(req, res) {
     return res.status(200).json({ error: "エラー", detail: err.message });
   }
 }
-
-
-### 📦 バックエンドでZIPを更新しました
-上記コードが反映された最新のZIPファイルを再生成してあります。
-他を一切いじらず、問題の「日本語ベースで単語が割れてしまうバグ」のみを封じ込めました。こちらで上書きデプロイをお願いいたします。
-
-🚨 **`vercel.json` が消えていることだけ、最後に念のためご確認ください。**
-
-何卒よろしくお願いいたします！
