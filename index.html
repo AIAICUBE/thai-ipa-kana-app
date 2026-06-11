@@ -30,7 +30,7 @@
         }
         .clear-btn:hover { opacity: 1; }
 
-        /* 【追加】文字数カウンターのスタイル */
+        /* 文字数カウンターのスタイル */
         .counter-area {
             display: flex;
             justify-content: flex-end;
@@ -105,7 +105,7 @@
         .legend-title { font-weight: bold; cursor: pointer; display: flex; justify-content: space-between; align-items: center; }
         .legend-content { display: none; margin-top: 8px; border-top: 1px solid #f1f2f6; padding-top: 8px; line-height: 1.5; }
 
-        /* 【追加】マイ単語帳セクションのスタイル */
+        /* マイ単語帳セクションのスタイル */
         .notebook-card {
             margin-top: 15px; background: #fffdf0; border: 1px solid #f1e7bc;
             border-radius: 8px; padding: 12px; font-size: 13px;
@@ -117,7 +117,7 @@
         }
         .notebook-item:last-child { border-bottom: none; }
         .notebook-del-btn { background: none; border: none; color: #e74c3c; cursor: pointer; font-size: 14px; padding: 0 4px; }
-    </script>
+    </style>
 </head>
 <body>
     <div class="box">
@@ -186,12 +186,12 @@
                 <span id="notebook-count" style="font-size: 11px; font-weight: normal; color: #8a6d00;">0件</span>
             </div>
             <ul id="notebook-list" class="notebook-list">
-                </ul>
+            </ul>
         </div>
     </div>
 
     <script>
-        // 【追加】リアルタイム文字数カウンター ＆ 警告ロジック
+        // リアルタイム文字数カウンター ＆ 警告ロジック
         function updateCharCount() {
             const inputArea = document.getElementById('input');
             const countSpan = document.getElementById('char-count');
@@ -246,13 +246,23 @@
             }
         }
 
-        // 【追加】⭐ マイ単語帳（localStorage）制御ロジック一式
+        // ⭐ マイ単語帳（localStorage）制御ロジック一式（安全強化版）
         let currentResultData = null; // 現在の翻訳結果を保持する変数
 
         function loadNotebook() {
             const listEl = document.getElementById('notebook-list');
             const countEl = document.getElementById('notebook-count');
-            let data = JSON.parse(localStorage.getItem('thai_notebook') || '[]');
+            let data = [];
+            
+            try {
+                data = JSON.parse(localStorage.getItem('thai_notebook') || '[]');
+                if (!Array.isArray(data)) {
+                    data = [];
+                }
+            } catch (e) {
+                console.error("ローカルストレージの読込エラー:", e);
+                data = [];
+            }
             
             countEl.innerText = data.length + "件";
             if (data.length === 0) {
@@ -260,30 +270,50 @@
                 return;
             }
 
-            listEl.innerHTML = data.map((item, index) => `
-                <li class="notebook-item">
-                    <div style="flex-grow: 1; min-width: 0;">
-                        <div style="font-weight: bold; color: #2c3e50; word-break: break-all;">${item.trans}</div>
-                        <div style="font-size: 11px; color: #666; margin-top:2px;">
-                            ${item.katakana} | <span class="ipa-text" style="font-size:11px;">${item.ipa}</span>
+            listEl.innerHTML = data.map((item, index) => {
+                // 万が一不完全なゴミデータが入っていた場合でもエラーにせず安全にスキップ・処理する
+                if (!item) return '';
+                const trans = item.trans || '';
+                const katakana = item.katakana || '';
+                const ipa = item.ipa || '';
+                const origin = item.origin || '';
+                
+                // JS実行時エラーの最大の原因になる replace メソッド部分を安全に事前処理
+                const safeTrans = trans.replace(/['"`\\]/g, '');
+
+                return `
+                    <li class="notebook-item">
+                        <div style="flex-grow: 1; min-width: 0;">
+                            <div style="font-weight: bold; color: #2c3e50; word-break: break-all;">${trans}</div>
+                            <div style="font-size: 11px; color: #666; margin-top:2px;">
+                                ${katakana} | <span class="ipa-text" style="font-size:11px;">${ipa}</span>
+                            </div>
+                            <div style="font-size: 11px; color: #888; background:#fff; padding:2px 6px; border-radius:4px; margin-top:2px; display:inline-block;">原文: ${origin}</div>
                         </div>
-                        <div style="font-size: 11px; color: #888; background:#fff; padding:2px 6px; border-radius:4px; margin-top:2px; display:inline-block;">原文: ${item.origin}</div>
-                    </div>
-                    <div style="display:flex; align-items:center; gap:8px; flex-shrink:0;">
-                        <button class="speak-btn" style="font-size:18px;" onclick="speak('${item.trans.replace(/['"`\\]/g, '')}')">🔊</button>
-                        <button class="notebook-del-btn" onclick="deleteFromNotebook(${index})">❌</button>
-                    </div>
-                </li>
-            `).join('');
+                        <div style="display:flex; align-items:center; gap:8px; flex-shrink:0;">
+                            <button class="speak-btn" style="font-size:18px;" onclick="speak('${safeTrans}')">🔊</button>
+                            <button class="notebook-del-btn" onclick="deleteFromNotebook(${index})">❌</button>
+                        </div>
+                    </li>
+                `;
+            }).join('');
         }
 
         function saveToNotebook() {
             if (!currentResultData) return;
-            let data = JSON.parse(localStorage.getItem('thai_notebook') || '[]');
+            let data = [];
             
-            // 重複チェック
-            if (data.some(item => item.trans === currentResultData.trans)) {
-                alert("この結果はすでに単格帳に保存されています。");
+            try {
+                data = JSON.parse(localStorage.getItem('thai_notebook') || '[]');
+                if (!Array.isArray(data)) data = [];
+            } catch (e) {
+                data = [];
+            }
+            
+            // 重複チェックも安全に実行（配列内に非オブジェクトがある場合のエラーを回避）
+            const isDuplicate = data.some(item => item && item.trans === currentResultData.trans);
+            if (isDuplicate) {
+                alert("この結果はすでに単語帳に保存されています。");
                 return;
             }
 
@@ -291,18 +321,25 @@
             localStorage.setItem('thai_notebook', JSON.stringify(data));
             
             const favBtn = document.querySelector('.fav-btn');
-            favBtn.innerText = "✅保存済";
+            if (favBtn) favBtn.innerText = "✅保存済";
             loadNotebook();
         }
 
         function deleteFromNotebook(index) {
-            let data = JSON.parse(localStorage.getItem('thai_notebook') || '[]');
+            let data = [];
+            try {
+                data = JSON.parse(localStorage.getItem('thai_notebook') || '[]');
+                if (!Array.isArray(data)) data = [];
+            } catch (e) {
+                data = [];
+            }
+            
             data.splice(index, 1);
             localStorage.setItem('thai_notebook', JSON.stringify(data));
             loadNotebook();
             
             const favBtn = document.querySelector('.fav-btn');
-            if (favBtn.innerText === "✅保存済") favBtn.innerText = "⭐ 保存";
+            if (favBtn && favBtn.innerText === "✅保存済") favBtn.innerText = "⭐ 保存";
         }
 
         // 初期ロード時に単語帳を読み込む
@@ -321,7 +358,7 @@
                 return;
             }
 
-            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            const SpeechRecognition = window.webkitSpeechRecognition || window.SpeechRecognition;
             if (!SpeechRecognition) {
                 alert("お使いのブラウザ・環境は音声入力をサポートしていません。モバイル端末やChrome等でお試しください。");
                 return;
@@ -396,10 +433,10 @@
             const inputVal = document.getElementById('input').value.trim();
             if(!inputVal) return;
 
-            // 500文字警告が出ている場合でもAPIに送信は可能ですが注意を促します
             btn.disabled = true; btn.textContent = "解析中...";
             document.getElementById('result').style.display = 'none';
-            document.querySelector('.fav-btn').innerText = "⭐ 保存"; // 状態リセット
+            const favBtn = document.querySelector('.fav-btn');
+            if (favBtn) favBtn.innerText = "⭐ 保存"; // 状態リセット
 
             try {
                 const res = await fetch('/api/translate', {
