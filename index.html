@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>タイ語⇆日本語 翻訳・タイ語発音解析</title>
+    <title>タイ語⇄日本語 翻訳・タイ語発音解析</title>
     <style>
         body { font-family: sans-serif; padding: 20px; background: #f0f2f5; color: #333; }
         .box { 
@@ -13,41 +13,63 @@
         }
         h2 { font-size: 1.2rem; text-align: center; margin-bottom: 20px; }
         
-        /* 入力エリア（クリアボタン配置用） */
-        .input-wrapper { position: relative; width: 100%; margin-bottom: 5px; }
+        /* 入力エリア */
+        .input-area { width: 100%; margin-bottom: 5px; position: relative; }
         textarea { 
             width: 100%; height: 100px; padding: 12px; padding-right: 35px; border: 1px solid #ddd; 
             border-radius: 8px; box-sizing: border-box; font-size: 18px; resize: vertical;
             display: block;
         }
-        /* 入力全消去ボタン */
+        
+        /* 入力クリア（全消去）ボタン */
         .clear-btn {
             position: absolute; right: 10px; top: 10px; background: #ccc; color: white;
             border: none; border-radius: 50%; width: 20px; height: 20px; font-size: 12px;
             cursor: pointer; display: flex; align-items: center; justify-content: center;
-            opacity: 0.7; transition: opacity 0.2s;
+            opacity: 0.7; transition: opacity 0.2s; z-index: 10;
         }
         .clear-btn:hover { opacity: 1; }
+
+        /* 【追加】文字数カウンターのスタイル */
+        .counter-area {
+            display: flex;
+            justify-content: flex-end;
+            font-size: 11px;
+            color: #888;
+            margin-top: 2px;
+            margin-bottom: 5px;
+        }
+        .counter-warn { color: #e74c3c; font-weight: bold; }
 
         .input-controls { 
             display: flex; justify-content: space-between; align-items: center; 
             gap: 10px; margin-top: 5px; margin-bottom: 10px;
         }
         
-        /* スピード調整スイッチ（カメさんモード） */
+        /* カメさんスピード選択用 */
         .speed-control { display: flex; align-items: center; gap: 5px; font-size: 13px; color: #666; }
+        .speed-control label { cursor: pointer; display: flex; align-items: center; gap: 3px; }
         .speed-control input { cursor: pointer; }
 
         .speak-btn { background: none; border: none; cursor: pointer; font-size: 24px; color: #3498db; padding: 0; transition: opacity 0.2s; }
         .speak-btn:hover { opacity: 0.7; }
         
-        /* クリップボードコピーボタン */
-        .copy-btn {
+        /* 音声認識作動中のマイクアイコンアニメーション */
+        @keyframes pulse {
+            0% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.1); opacity: 0.8; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        .recording-active { color: #e74c3c !important; animation: pulse 1.2s infinite; }
+
+        /* クリップボードコピーボタン・星マークボタン */
+        .copy-btn, .fav-btn {
             background: #f1f2f6; border: 1px solid #ced6e0; border-radius: 4px;
             padding: 3px 8px; font-size: 11px; cursor: pointer; color: #57606f;
-            margin-left: 10px; transition: all 0.2s;
+            transition: all 0.2s; display: flex; align-items: center; gap: 3px;
         }
-        .copy-btn:hover { background: #dfe4ea; }
+        .copy-btn:hover, .fav-btn:hover { background: #dfe4ea; }
+        .fav-btn { color: #e67e22; border-color: #f39c12; }
 
         #main-btn { 
             width: 100%; padding: 15px; background: #00b894; color: white; 
@@ -57,7 +79,6 @@
         #main-btn:disabled { background: #ccc; }
         
         .res-box { margin-top: 25px; border-top: 2px solid #eee; padding-top: 20px; display: none; }
-        
         .full-card { 
             background: #e8f4f8; padding: 15px; border-radius: 10px; 
             margin-bottom: 20px; border-left: 5px solid #3498db; 
@@ -76,30 +97,53 @@
         }
         .thai-word { font-size: 24px; font-weight: bold; color: #00b894; word-break: break-all; }
 
-        /* 声調カンペ（アコーディオン） */
+        /* 声調記号の凡例アコーディオン */
         .legend-card {
             margin-top: 20px; background: #fdfefe; border: 1px solid #e1e8ed;
             border-radius: 8px; padding: 10px; font-size: 12px; color: #555;
         }
-        .legend-title { font-weight: bold; cursor: pointer; display: flex; justify-content: space-between; }
+        .legend-title { font-weight: bold; cursor: pointer; display: flex; justify-content: space-between; align-items: center; }
         .legend-content { display: none; margin-top: 8px; border-top: 1px solid #f1f2f6; padding-top: 8px; line-height: 1.5; }
-    </style>
+
+        /* 【追加】マイ単語帳セクションのスタイル */
+        .notebook-card {
+            margin-top: 15px; background: #fffdf0; border: 1px solid #f1e7bc;
+            border-radius: 8px; padding: 12px; font-size: 13px;
+        }
+        .notebook-title { font-weight: bold; color: #b78a00; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; }
+        .notebook-list { max-height: 200px; overflow-y: auto; padding: 0; margin: 0; list-style: none; }
+        .notebook-item {
+            padding: 8px; border-bottom: 1px solid #f9f5d7; display: flex; justify-content: space-between; align-items: center; gap: 10px;
+        }
+        .notebook-item:last-child { border-bottom: none; }
+        .notebook-del-btn { background: none; border: none; color: #e74c3c; cursor: pointer; font-size: 14px; padding: 0 4px; }
+    </script>
 </head>
 <body>
     <div class="box">
-        <h2>タイ語⇆日本語 翻訳・タイ語発音解析</h2>
-        <div class="input-wrapper">
-            <textarea id="input" placeholder="タイ語または日本語を入力..."></textarea>
+        <h2>タイ語⇄日本語 翻訳・タイ語発音解析</h2>
+        <div class="input-area">
+            <textarea id="input" placeholder="タイ語または日本語を入力..." oninput="updateCharCount()"></textarea>
             <button class="clear-btn" onclick="clearInput()" title="入力を全消去">×</button>
         </div>
+        
+        <div class="counter-area">
+            <span id="char-count">0</span> / 500文字
+        </div>
+
         <div class="input-controls">
-            <!-- カメさんスピード調整 -->
             <div class="speed-control">
                 <label><input type="checkbox" id="slow-mode"> 🐢ゆっくり再生</label>
             </div>
-            <div style="display: flex; align-items: center; gap: 5px;">
-                <span style="font-size: 12px; color: #888;">入力を聞く:</span>
-                <button class="speak-btn" onclick="speakInput()">🔊</button>
+            <div style="display: flex; align-items: center; gap: 12px;">
+                <div style="display: flex; align-items: center; gap: 4px;">
+                    <span style="font-size: 12px; color: #888;">音声入力:</span>
+                    <button id="mic-btn" class="speak-btn" onclick="toggleSpeechRecognition()" title="声で文字入力">🎤</button>
+                </div>
+                <div style="display: flex; align-items: center; gap: 4px;">
+                    <span style="font-size: 12px; color: #888;">入力を聞く:</span>
+                    <button class="speak-btn" onclick="speakInput()">🔊</button>
+                </div>
             </div>
         </div>
         
@@ -109,10 +153,10 @@
             <div class="full-card">
                 <div style="display:flex; justify-content:space-between; align-items: flex-start; gap: 10px;">
                     <span id="full-trans" class="full-text"></span>
-                    <div style="display: flex; align-items: center; flex-shrink: 0;">
-                        <!-- コピーボタン -->
+                    <div style="display: flex; align-items: center; gap: 6px; flex-shrink: 0;">
+                        <button class="fav-btn" onclick="saveToNotebook()">⭐ 保存</button>
                         <button class="copy-btn" onclick="copyResult()">📋コピー</button>
-                        <button id="speak-output-btn" class="speak-btn" style="margin-left: 8px;">🔊</button>
+                        <button id="speak-output-btn" class="speak-btn">🔊</button>
                     </div>
                 </div>
                 <div class="detail-line"><strong>IPA:</strong> <span id="full-ipa" class="ipa-text"></span></div>
@@ -121,7 +165,6 @@
             <div id="word-list"></div>
         </div>
 
-        <!-- 声調記号のカンペ -->
         <div class="legend-card">
             <div class="legend-title" onclick="toggleLegend()">
                 <span>💡 カタカナ声調記号の読み方（凡例）</span>
@@ -136,16 +179,40 @@
                 <strong>〜 長音（ちょうおん）：</strong>母音をのばして発音する
             </div>
         </div>
+
+        <div class="notebook-card">
+            <div class="notebook-title">
+                <span>⭐ マイ単語帳（ローカル保存）</span>
+                <span id="notebook-count" style="font-size: 11px; font-weight: normal; color: #8a6d00;">0件</span>
+            </div>
+            <ul id="notebook-list" class="notebook-list">
+                </ul>
+        </div>
     </div>
 
     <script>
-        // 入力全消去
+        // 【追加】リアルタイム文字数カウンター ＆ 警告ロジック
+        function updateCharCount() {
+            const inputArea = document.getElementById('input');
+            const countSpan = document.getElementById('char-count');
+            const len = inputArea.value.length;
+            
+            countSpan.innerText = len;
+            if (len > 500) {
+                countSpan.classList.add('counter-warn');
+            } else {
+                countSpan.classList.remove('counter-warn');
+            }
+        }
+
+        // 入力の全消去機能
         function clearInput() {
             document.getElementById('input').value = '';
+            updateCharCount(); // カウンターをリセット
             document.getElementById('input').focus();
         }
 
-        // コピー機能（iframe対応の安全なクラシック方式）
+        // コピー機能
         function copyResult() {
             const textToCopy = document.getElementById('full-trans').innerText;
             if (!textToCopy) return;
@@ -166,7 +233,7 @@
             document.body.removeChild(tempTextArea);
         }
 
-        // 凡例トグル
+        // 凡例表示トグル
         function toggleLegend() {
             const content = document.getElementById('legend-content');
             const arrow = document.getElementById('legend-arrow');
@@ -177,6 +244,124 @@
                 content.style.display = 'block';
                 arrow.innerText = '▲';
             }
+        }
+
+        // 【追加】⭐ マイ単語帳（localStorage）制御ロジック一式
+        let currentResultData = null; // 現在の翻訳結果を保持する変数
+
+        function loadNotebook() {
+            const listEl = document.getElementById('notebook-list');
+            const countEl = document.getElementById('notebook-count');
+            let data = JSON.parse(localStorage.getItem('thai_notebook') || '[]');
+            
+            countEl.innerText = data.length + "件";
+            if (data.length === 0) {
+                listEl.innerHTML = `<li style="color:#aaa; font-size:12px; text-align:center; padding:10px;">保存された単語はありません。</li>`;
+                return;
+            }
+
+            listEl.innerHTML = data.map((item, index) => `
+                <li class="notebook-item">
+                    <div style="flex-grow: 1; min-width: 0;">
+                        <div style="font-weight: bold; color: #2c3e50; word-break: break-all;">${item.trans}</div>
+                        <div style="font-size: 11px; color: #666; margin-top:2px;">
+                            ${item.katakana} | <span class="ipa-text" style="font-size:11px;">${item.ipa}</span>
+                        </div>
+                        <div style="font-size: 11px; color: #888; background:#fff; padding:2px 6px; border-radius:4px; margin-top:2px; display:inline-block;">原文: ${item.origin}</div>
+                    </div>
+                    <div style="display:flex; align-items:center; gap:8px; flex-shrink:0;">
+                        <button class="speak-btn" style="font-size:18px;" onclick="speak('${item.trans.replace(/['"`\\]/g, '')}')">🔊</button>
+                        <button class="notebook-del-btn" onclick="deleteFromNotebook(${index})">❌</button>
+                    </div>
+                </li>
+            `).join('');
+        }
+
+        function saveToNotebook() {
+            if (!currentResultData) return;
+            let data = JSON.parse(localStorage.getItem('thai_notebook') || '[]');
+            
+            // 重複チェック
+            if (data.some(item => item.trans === currentResultData.trans)) {
+                alert("この結果はすでに単格帳に保存されています。");
+                return;
+            }
+
+            data.unshift(currentResultData); // 先頭に追加
+            localStorage.setItem('thai_notebook', JSON.stringify(data));
+            
+            const favBtn = document.querySelector('.fav-btn');
+            favBtn.innerText = "✅保存済";
+            loadNotebook();
+        }
+
+        function deleteFromNotebook(index) {
+            let data = JSON.parse(localStorage.getItem('thai_notebook') || '[]');
+            data.splice(index, 1);
+            localStorage.setItem('thai_notebook', JSON.stringify(data));
+            loadNotebook();
+            
+            const favBtn = document.querySelector('.fav-btn');
+            if (favBtn.innerText === "✅保存済") favBtn.innerText = "⭐ 保存";
+        }
+
+        // 初期ロード時に単語帳を読み込む
+        window.addEventListener('DOMContentLoaded', loadNotebook);
+
+        // 音声認識（Speech Recognition）の制御
+        let recognition = null;
+        let isListening = false;
+
+        function toggleSpeechRecognition() {
+            const micBtn = document.getElementById('mic-btn');
+            const inputArea = document.getElementById('input');
+
+            if (isListening) {
+                if (recognition) recognition.stop();
+                return;
+            }
+
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (!SpeechRecognition) {
+                alert("お使いのブラウザ・環境は音声入力をサポートしていません。モバイル端末やChrome等でお試しください。");
+                return;
+            }
+
+            recognition = new SpeechRecognition();
+            
+            const currentText = inputArea.value.trim();
+            const isThaiInput = /[\u0E00-\u0E7F]/.test(currentText);
+            recognition.lang = isThaiInput ? 'th-TH' : 'ja-JP';
+            
+            recognition.continuous = false;
+            recognition.interimResults = false;
+
+            recognition.onstart = () => {
+                isListening = true;
+                micBtn.classList.add('recording-active');
+                inputArea.placeholder = "音声を聞き取り中（お話しください）...";
+            };
+
+            recognition.onend = () => {
+                isListening = false;
+                micBtn.classList.remove('recording-active');
+                inputArea.placeholder = "タイ語または日本語を入力...";
+            };
+
+            recognition.onresult = (event) => {
+                const speechResult = event.results[0][0].transcript;
+                inputArea.value = speechResult;
+                updateCharCount(); // 文字数を更新
+            };
+
+            recognition.onerror = (event) => {
+                console.error("音声認識エラー:", event.error);
+                isListening = false;
+                micBtn.classList.remove('recording-active');
+                inputArea.placeholder = "タイ語または日本語を入力...";
+            };
+
+            recognition.start();
         }
 
         function speak(text) {
@@ -193,11 +378,10 @@
                         voices.find(v => v.lang.includes(isThai ? 'th' : 'ja'));
             
             if (voice) uttr.voice = voice;
-
-            // ✅ カメさん（ゆっくり再生）スイッチがONなら速度を0.6にする
+            
             const slowMode = document.getElementById('slow-mode').checked;
             uttr.rate = slowMode ? 0.6 : 0.9;
-
+            
             window.speechSynthesis.speak(uttr);
         }
 
@@ -212,8 +396,10 @@
             const inputVal = document.getElementById('input').value.trim();
             if(!inputVal) return;
 
+            // 500文字警告が出ている場合でもAPIに送信は可能ですが注意を促します
             btn.disabled = true; btn.textContent = "解析中...";
             document.getElementById('result').style.display = 'none';
+            document.querySelector('.fav-btn').innerText = "⭐ 保存"; // 状態リセット
 
             try {
                 const res = await fetch('/api/translate', {
@@ -228,6 +414,14 @@
                 document.getElementById('full-ipa').innerText = data.full_ipa;
                 document.getElementById('full-katakana').innerText = data.full_katakana;
                 
+                // 単語帳保存用のオブジェクトを構築
+                currentResultData = {
+                    origin: inputVal,
+                    trans: data.full_translation,
+                    ipa: data.full_ipa,
+                    katakana: data.full_katakana
+                };
+
                 document.getElementById('speak-output-btn').onclick = () => speak(data.full_translation);
 
                 const list = document.getElementById('word-list');
