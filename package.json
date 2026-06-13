@@ -1,10 +1,12 @@
 {
   "name": "thai-translator",
-  "version": "1.4.0",
+  "version": "1.9.5",
+  "description": "タイ語⇄日本語 翻訳・タイ語発音解析ツール",
   "main": "index.html",
   "type": "module",
   "private": true,
   "engines": {
     "node": "20.x"
-  }
+  },
+  "dependencies": {}
 }
