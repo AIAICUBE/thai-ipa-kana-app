@@ -484,7 +484,7 @@
             if (!response.ok) throw new Error("TTS APIエラー");
 
             const data = await response.json();
-            if (data.error) throw new Error(data.error);
+            if (data.error) throw new Error(data.detail ? `${data.error}: ${data.detail}` : data.error);
 
             const pcmBase64 = data.audio_data;
             const mimeType = data.mime_type || "audio/L16;rate=24000";
@@ -575,7 +575,7 @@
             if (!response.ok) throw new Error("翻訳APIエラー");
 
             const data = await response.json();
-            if (data.error) throw new Error(data.error);
+            if (data.error) throw new Error(data.detail ? `${data.error}: ${data.detail}` : data.error);
 
             return data;
         }
