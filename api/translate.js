@@ -8,7 +8,10 @@ export default async function handler(req, res) {
   try {
     const { action, text } = req.body;
     const apiKey = process.env.GEMINI_API_KEY?.trim();
-    if (!apiKey) throw new Error("APIキーが未設定です");
+
+    if (!apiKey) {
+      return res.status(500).json({ error: "APIキー未設定" });
+    }
 
     if (action === 'tts') {
       const isThai = /[\u0E00-\u0E7F]/.test(text);
@@ -27,13 +30,12 @@ export default async function handler(req, res) {
       return res.status(200).json({ audio_data: data.candidates[0].content.parts[0].inlineData.data });
     }
 
-    const prompt = `あなたはタイ語と言語学の専門家です。
-    入力されたテキストを翻訳し、以下のJSON構造のみで返してください。
+    const prompt = `あなたは言語学の専門家です。テキストを翻訳し、JSONのみで出力してください。
     {
-      "full_translation": "翻訳結果",
-      "full_ipa": "音節ハイフン区切りIPA",
-      "full_katakana": "声調記号付きカタカナ",
-      "words": [{"thai": "単語", "reading": "カナ", "ipa": "IPA", "meaning": "意味"}]
+      "full_translation": "...",
+      "full_ipa": "...",
+      "full_katakana": "...",
+      "words": [{"thai": "...", "reading": "...", "ipa": "...", "meaning": "..."}]
     }
     入力: ${text}`;
 
@@ -45,7 +47,7 @@ export default async function handler(req, res) {
         generationConfig: { responseMimeType: "application/json", temperature: 0.1 }
       })
     });
-
+    
     const data = await response.json();
     const resultText = data.candidates[0].content.parts[0].text;
     const cleanJson = resultText.replace(/
