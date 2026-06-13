@@ -53,10 +53,14 @@ export default async function handler(req, res) {
         delay *= 2;
       }
 
-      if (!response.ok) throw new Error("TTS APIエラー");
+      const data = await response.json().catch(() => null);
 
-      const data = await response.json();
-      if (data.error) return res.status(200).json({ error: data.error.message });
+      if (data?.error) {
+        return res.status(200).json({ error: data.error.message || JSON.stringify(data.error) });
+      }
+      if (!response.ok) {
+        throw new Error(`TTS APIエラー (HTTP ${response.status}): ${data ? JSON.stringify(data) : '(本文なし)'}`);
+      }
 
       const part = data.candidates?.[0]?.content?.parts?.[0]?.inlineData;
       const audioData = part?.data;
@@ -141,10 +145,14 @@ export default async function handler(req, res) {
       delay *= 2;
     }
 
-    if (!response.ok) throw new Error("翻訳APIエラー");
+    const data = await response.json().catch(() => null);
 
-    const data = await response.json();
-    if (data.error) return res.status(200).json({ error: data.error.message });
+    if (data?.error) {
+      return res.status(200).json({ error: data.error.message || JSON.stringify(data.error) });
+    }
+    if (!response.ok) {
+      throw new Error(`翻訳APIエラー (HTTP ${response.status}): ${data ? JSON.stringify(data) : '(本文なし)'}`);
+    }
 
     const resultText = data.candidates?.[0]?.content?.parts?.[0]?.text;
     if (!resultText) throw new Error("AI応答なし");
