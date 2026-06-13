@@ -72,7 +72,7 @@ export default async function handler(req, res) {
     }
 
     // ==========================================
-    // 🧠 Gemini 2.5 Proによる超高精度翻訳＆言語解析
+    // 🧠 Gemini 2.5 Flashによる翻訳＆言語解析
     // ==========================================
     const systemPrompt = `あなたはタイ語と言語学（特に日泰・泰日対照言語学）の第一人者です。
 入力されたテキスト（日本語またはタイ語）を極めて自然かつ文脈に即した表現で翻訳し、その発音と単語構成を完璧に解析してください。
@@ -130,7 +130,7 @@ export default async function handler(req, res) {
     for (let i = 0; i < 5; i++) {
       try {
         response = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key=${apiKey}`,
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
           {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
